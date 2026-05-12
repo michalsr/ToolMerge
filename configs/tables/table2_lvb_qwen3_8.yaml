@@ -1,0 +1,24 @@
+# Paper Table 2 — Long Video Bench, Qwen3-VL answerer, 8 frames.
+#
+# Qwen3-VL 8f rows use the `v1` answer template (not `lif`). Every other
+# paper row uses `lif`. Run this config end-to-end to reproduce the paper
+# 8f Qwen3 LVB number.
+
+defaults:
+  - ../default
+
+data:
+  input_path: ${oc.env:TOOLMERGE_DATA_DIR,data}/longvideobench/lvb_val_std.json
+  save_path: ${oc.env:TOOLMERGE_OUTPUT_DIR,outputs}/table2_lvb_qwen3_8
+
+# Long Video Bench cache subdir (cache_build/build_*.sh write here).
+siglip_feature_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/siglip/longvideobench
+tren_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/tren/longvideobench
+ocr_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr/longvideobench
+ocr_judge_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr_judge/longvideobench
+
+max_final_k: 8
+model_backend: qwen3vl
+
+answer_generator:
+  prompt_template: v1

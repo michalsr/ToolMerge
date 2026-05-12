@@ -1,0 +1,32 @@
+name: haystack
+channels:
+  - pytorch
+  - nvidia
+  - defaults
+dependencies:
+  - python=3.11
+  - pip=2.24.2
+  - pip:
+    - numpy==1.26.4
+    - openai
+    - pillow
+    - opencv-python
+    - matplotlib
+    - imageio
+    - requests
+    - mmengine==0.10.6
+    - torch==2.1.0
+    - mmdet==3.0.0
+    - supervision==0.19.0
+    - decord
+    - seaborn
+    - datasets
+    - mmyolo
+    - opencv-python-headless
+    - mmcv==2.0.0
+    - mmyolo
+    - timm
+    - transformers==4.28.0
+    - albumentations
+    - gradio
+

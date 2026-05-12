@@ -1,0 +1,76 @@
+# Parent config inherited by every per-table YAML under configs/tables/.
+# Override any field in the table-specific YAML (e.g. `defaults: [- ../default]`)
+# or at the CLI via dotted overrides (e.g. `max_final_k=32`).
+# Env vars below (TOOLMERGE_DATA_DIR / TOOLMERGE_CACHE_DIR / TOOLMERGE_OUTPUT_DIR
+# and OPENAI/AZURE_OPENAI_*) are optional — defaults are relative `./data` etc.
+
+# === Model loading (local Qwen3-VL only; ignored for OpenAI backend) ============
+model:
+  base: Qwen/Qwen3-VL-8B-Instruct      # HF Hub model id or local checkpoint path
+  attn_implementation: flash_attention_2  # `flash_attention_2`, `sdpa`, or `eager`
+  device_map: auto                     # `auto`, `cuda:0`, or a custom dict
+
+# `qwen3vl` runs locally on a GPU; `openai` calls OpenAI / Azure (set OPENAI_API_KEY,
+# OPENAI_BASE_URL). The same backend is used for the planner unless `planner_backend`
+# is set below (rarely needed).
+model_backend: qwen3vl
+qwen_version: qwen3                    # `qwen3` (paper) or `qwen2_5` for older checkpoints
+
+# === Dataset + raw videos ======================================================
+data:
+  input_path: ???                      # mandatory — dataset JSON (LVB / VMME / M2C-v2 schema)
+  save_path: ???                       # mandatory — output dir (results.json + accuracy.json land here)
+  video_dir: ${oc.env:TOOLMERGE_DATA_DIR,data}/videos  # where raw .mp4s live
+  video_backend: opencv                # `opencv` (cv2, recommended) or `decord`
+  start_idx: 0                         # slice start (inclusive)
+  end_idx: null                        # slice end (exclusive); null = run to last item
+  source_dir: ""                       # if set, reanswer mode: read frames from a prior
+                                       # run's results.json / keyframes.json, skip planner+tools
+
+# === Planner (text-only LLM call that emits the tool-call JSON) ================
+planner_prompt: v7_no_temporal         # template under toolmerge/prompts/planner/
+planner_max_new_tokens: 512            # paper default; planner output ~250 tokens typically
+planner_temperature: 0.0               # greedy decoding for determinism
+planner_do_sample: false
+planner_num_frames: 0                  # 0 = text-only planner (paper). >0 enables vision input.
+
+# === Tools — per-video score caches ============================================
+# All paths default to a `${TOOLMERGE_CACHE_DIR}/<tool>/<dataset>/` layout produced by
+# cache_build/build_caches.py. Per-table configs override these.
+enabled_tools: [siglip, tren]          # drop a tool here to ablate it
+siglip_feature_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/siglip
+tren_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/tren
+ocr_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr
+
+# === OCR judge — LLM filter over per-frame OCR text ============================
+# An LLM judges which frames' OCR contains text relevant to the question. Hits are
+# injected into the merged score list with weight 1.0. Disable by clearing ocr_cache_dir.
+ocr_llm_model: openai:gpt-4o-mini      # `openai:<model>` routes via OpenAIBackend
+ocr_llm_max_tokens: 256
+ocr_batch_size: 20                     # frames per LLM call (>1 batches the judge prompt)
+ocr_pool_seconds: -1                   # -1 = auto (matches min_frame_gap_cap_seconds);
+                                       # >0 = collapse adjacent OCR hits within N seconds
+ocr_judge_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr_judge
+
+# === Selection (threshold + greedy NMS) =======================================
+# After AND/OR merging, drop frames below `score_threshold_value`, then pick top-K with
+# a temporal gap. Paper default: threshold 0 (keep everything), auto-τ = min(D/(2K), 10)s.
+score_threshold_value: 0.0
+max_final_k: 8                         # override to 32 for the K=32 paper rows
+pool_k_values: [8, 16, 32, 64]         # also save top-K candidates at these K's in the trace;
+                                       # used by reanswer mode (data.source_dir)
+min_frame_gap_seconds: -1.0            # -1 = auto from above formula; 0 = no gap; >0 = fixed gap
+min_frame_gap_cap_seconds: 10.0        # cap on auto-τ when video is long
+
+# === Answerer (VLM call with the K selected frames) ===========================
+answer_generator:
+  prompt_template: lif                 # `lif` (default) or `v1` (Qwen3-VL @ K=8 paper convention)
+  max_new_tokens: 128
+  temperature: 0.0                     # greedy
+  do_sample: false
+  mode: letter_only                    # `letter_only` or `letter_and_confidence`
+
+# === Misc =====================================================================
+seed: 42                               # affects torch / numpy / random seeds (most ops are deterministic)
+save_trace: true                       # include planner / OCR / per-query / selection debug in each result
+save_every_n: 5                        # checkpoint results.json every N items (enables resume on restart)

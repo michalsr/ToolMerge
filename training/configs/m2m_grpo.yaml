@@ -1,0 +1,71 @@
+# Planner GRPO training — Molmo-2 Moments, frames_in_gt + consistency reward.
+#
+# Paper recipe: 1 node × 4 GPUs (effective batch = 4 × per_device_bs=2 ×
+# grad_accum=8 / num_gen=8 = 8 unique prompts per optimizer step), max_steps=50.
+# The released checkpoint is the `global_step=50` snapshot of this run.
+
+model:
+  base: Qwen/Qwen3-VL-8B-Instruct
+  freeze_vision_encoder: true
+  attn_implementation: flash_attention_2
+  torch_dtype: bfloat16
+
+planner:
+  prompt_template: v7_no_temporal
+  num_overview_frames: 0
+
+# Inference config used at reward time: it controls which SigLIP / T-REN / OCR
+# caches the rollouts use. Mirror it from the user's local cache layout.
+inference_config: training/configs/lvb_v7_no_temporal_t0_train.yaml
+
+# Training data: the prepared subset of M2M train.json (filtered to questions
+# the answerer gets wrong on uniform 8f from inside the GT clip, max 1 per clip).
+# ~50% of the full train split.
+train_data_path: training/data/train_correct_uniform_8f_clip_max1.json
+start_idx: 0
+end_idx: -1                          # use the entire subset (~1500 items)
+
+# Hold-out validation: trim to 200 items so each eval pass stays ~10 min.
+val_data_path: ${oc.env:TOOLMERGE_DATA_DIR,data}/m2m/val.json
+val_start_idx: 0
+val_end_idx: 200
+early_stopping_patience: 3
+
+reward:
+  # consistency=1 anchors the policy against malformed completions (-1 on bad
+  # JSON, +1 on parseable plans). frames_in_gt=1 is the actual recall signal.
+  consistency_weight: 1.0
+  frames_in_gt_weight: 1.0
+
+# TRL GRPOConfig overrides
+trl:
+  output_dir: null                   # required; set via CLI: trl.output_dir=…
+  num_train_epochs: 2
+  num_generations: 8
+  num_generations_eval: 1
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 8
+  logging_steps: 1
+  eval_strategy: steps
+  eval_steps: 50
+  save_strategy: steps
+  save_steps: 25                     # checkpoints at 25, 50, 75, ...
+  save_total_limit: 2
+  load_best_model_at_end: false      # TRL 0.27.2 GRPO incompat; trainer handles best-val externally
+  max_steps: 50                      # stop at the paper checkpoint step
+  report_to:
+    - wandb
+  run_name: toolmerge_grpo_m2m
+  log_completions: true
+  num_completions_to_print: 4
+  max_completion_length: 512
+  gradient_checkpointing: false
+  bf16: true
+  optim: paged_adamw_8bit
+  learning_rate: 1.0e-6
+  beta: 0.0
+  temperature: 0.7
+  top_p: 0.8
+  top_k: 20
+  deepspeed: training/configs/deepspeed_zero2.json

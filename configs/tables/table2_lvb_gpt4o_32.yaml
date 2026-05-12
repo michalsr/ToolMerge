@@ -1,0 +1,20 @@
+# Paper Table 2 — Long Video Bench, GPT-4o answerer, 32 frames.
+# Reanswer from the LVB Qwen3 8f run via `data.source_dir`. Set
+# OPENAI_API_KEY / Azure base URL before running.
+
+defaults:
+  - ../default
+
+data:
+  input_path: ${oc.env:TOOLMERGE_DATA_DIR,data}/longvideobench/lvb_val_std.json
+  save_path: ${oc.env:TOOLMERGE_OUTPUT_DIR,outputs}/table2_lvb_gpt4o_32
+
+siglip_feature_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/siglip/longvideobench
+tren_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/tren/longvideobench
+ocr_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr/longvideobench
+ocr_judge_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr_judge/longvideobench
+
+max_final_k: 32
+model_backend: openai
+openai:
+  model_name: gpt-4o

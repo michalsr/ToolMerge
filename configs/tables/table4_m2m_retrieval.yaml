@@ -1,0 +1,22 @@
+# Paper Table 4 — Molmo-2 Moments question retrieval (HIT@K).
+#
+# This config produces keyframe sets only — accuracy is HIT@K computed by
+# checking whether any of the K selected frames falls inside the ground-truth
+# clip interval. Score the retrieval externally with scripts/hit_at_k.py.
+
+defaults:
+  - ../default
+
+data:
+  input_path: ${oc.env:TOOLMERGE_DATA_DIR,data}/m2m/test.json
+  save_path: ${oc.env:TOOLMERGE_OUTPUT_DIR,outputs}/table4_m2m_retrieval
+
+siglip_feature_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/siglip/molmo2_moments
+tren_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/tren/molmo2_moments
+ocr_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr/molmo2_moments
+ocr_judge_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr_judge/molmo2_moments
+
+# Pool every K used in the paper so retrieval @1,2,4,8,16,32 can be scored in one pass.
+pool_k_values: [1, 2, 4, 8, 16, 32]
+max_final_k: 32
+model_backend: qwen3vl

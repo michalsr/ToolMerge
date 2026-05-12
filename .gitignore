@@ -1,0 +1,69 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.installed.cfg
+*.egg
+build/
+dist/
+.eggs/
+
+# Virtual envs
+.venv/
+venv/
+env/.venv/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*~
+
+# Logs / outputs
+*.log
+output/
+outputs/
+runs/
+wandb/
+**/slurm/logs/*.out
+**/slurm/logs/*.err
+
+# Local env
+.env
+.env.local
+
+# Model weights and large data (host on HF Hub, not git)
+tren/weights/*.pth
+training/data/checkpoints/
+**/*.safetensors
+
+# Feature / frame caches (precomputed; host on HF Hub or build locally)
+**/feature_cache/
+**/frame_cache/
+**/tren_cache/
+**/ocr_cache/
+**/ocr_judge_cache/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Vendored-baseline heavy data and submodules (download separately per baseline README)
+baselines/lif/Datasets/
+baselines/lif/data/coco/
+baselines/lif/YOLO-World/third_party/
+
+# Internal trackers (not part of the public release)
+RESULTS_MATRIX.md
+
+# Delta-cluster-specific Slurm scripts (kept locally for internal testing; not public)
+scripts/slurm/lvb_qwen3_*.sbatch
+scripts/slurm/vmme_qwen3_*.sbatch
+scripts/slurm/m2c_v2_qwen3_*.sbatch
+scripts/slurm/*_gpt4o_*.sbatch
+training/slurm/train_grpo.sbatch

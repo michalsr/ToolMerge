@@ -1,0 +1,21 @@
+# Paper Table 2 — Video-MME (long split), Qwen3-VL answerer, 8 frames.
+# Qwen3-VL 8f rows use the `v1` answer template.
+
+defaults:
+  - ../default
+
+data:
+  input_path: ${oc.env:TOOLMERGE_DATA_DIR,data}/video_mme/video_mme_long.json
+  save_path: ${oc.env:TOOLMERGE_OUTPUT_DIR,outputs}/table2_vmme_qwen3_8
+  video_dir: ${oc.env:TOOLMERGE_DATA_DIR,data}/video_mme/videos
+
+siglip_feature_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/siglip/video_mme
+tren_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/tren/video_mme
+ocr_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr/video_mme
+ocr_judge_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr_judge/video_mme
+
+max_final_k: 8
+model_backend: qwen3vl
+
+answer_generator:
+  prompt_template: v1

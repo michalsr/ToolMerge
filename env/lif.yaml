@@ -1,0 +1,41 @@
+name: toolmerge-lif
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+
+# Separate conda env required by the LIF baseline (`baselines/lif/`). LIF
+# pins mmcv / mmdet versions that conflict with the main `toolmerge` env, and
+# additionally requires a small patch to PyTorch's source (the original LIF
+# repo's README documents which line to edit).
+#
+# Workflow:
+#   1. Build this env (`conda env create -f env/lif.yaml`).
+#   2. Apply the PyTorch source patch as described in `baselines/lif/README.md`.
+#   3. Activate this env *only when running the LIF baseline* — `toolmerge`
+#      itself + every other baseline stays in the main `toolmerge` env.
+#
+# LIF is the only baseline with this constraint; the others share the main env.
+
+dependencies:
+  - python=3.10
+  - pip
+  - pytorch=2.1.*
+  - pytorch-cuda=12.1
+  - cudatoolkit-dev=12.1
+  - pip:
+      - transformers>=4.45
+      - accelerate>=0.30
+      - omegaconf>=2.3
+      - opencv-python>=4.8
+      - decord>=0.6
+      - Pillow>=10
+      - tqdm>=4.65
+      - openai>=1.30
+      # LIF-specific (pinned by the LIF authors)
+      - mmcv-full==1.7.0
+      - mmdet==2.28.0
+      - ultralytics-yolo-world>=0.1
+      # YOLO-World checkpoint loader (LIF README points to the v2-XL weights)
+      - timm>=0.9

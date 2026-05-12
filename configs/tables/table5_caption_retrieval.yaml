@@ -1,0 +1,22 @@
+# Paper Table 5 — caption retrieval (1000-caption set).
+#
+# Reads the caption (instead of the question + answer choices) as the planner
+# query. The same `v7_no_temporal` prompt is used for caption retrieval per
+# the paper / user feedback.
+
+defaults:
+  - ../default
+
+data:
+  input_path: ${oc.env:TOOLMERGE_DATA_DIR,data}/m2m/captions_1k.json
+  save_path: ${oc.env:TOOLMERGE_OUTPUT_DIR,outputs}/table5_caption_retrieval
+
+siglip_feature_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/siglip/molmo2_captions
+tren_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/tren/molmo2_captions
+ocr_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr/molmo2_captions
+ocr_judge_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr_judge/molmo2_captions
+
+# Pool every K used in the paper so HIT@1..HIT@32 can be scored in one pass.
+pool_k_values: [1, 2, 4, 8, 16, 32]
+max_final_k: 32
+model_backend: qwen3vl

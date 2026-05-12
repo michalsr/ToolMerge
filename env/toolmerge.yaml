@@ -1,0 +1,38 @@
+name: toolmerge
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+  - pip
+  - pytorch=2.4.*
+  - pytorch-cuda=12.1
+  - cuda-toolkit=12.1
+  - cudatoolkit-dev
+  - pip:
+      # Pinned to what the paper run used (TRL 0.27.2 + transformers 4.57.*).
+      - transformers>=4.57,<4.58
+      - accelerate>=0.30
+      - trl==0.27.2
+      - peft>=0.10
+      - deepspeed>=0.14
+      # Core method
+      - omegaconf>=2.3
+      - flash-attn>=2.5 --no-build-isolation  # comment out if unsupported on your GPU
+      - opencv-python>=4.8
+      - decord>=0.6
+      - Pillow>=10
+      - tqdm>=4.65
+      - coloredlogs>=15
+      # Tools
+      - easyocr>=1.7
+      - rapidfuzz>=3.5
+      # APIs
+      - openai>=1.30
+      - huggingface-hub>=0.23
+      # Dev
+      - pytest>=7
+      - wandb>=0.16

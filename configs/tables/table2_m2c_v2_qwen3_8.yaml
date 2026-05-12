@@ -1,0 +1,22 @@
+# Paper Table 2 — Molmo-2 Moments v2 test, Qwen3-VL answerer, 8 frames.
+# Qwen3-VL 8f rows use the `v1` answer template. Equivalent in content to
+# table3_m2m_qa_qwen3_8.yaml but renamed to follow the table2 sweep naming.
+
+defaults:
+  - ../default
+
+data:
+  input_path: ${oc.env:TOOLMERGE_DATA_DIR,data}/m2c_v2/test.json
+  save_path: ${oc.env:TOOLMERGE_OUTPUT_DIR,outputs}/table2_m2c_v2_qwen3_8
+  video_dir: ${oc.env:TOOLMERGE_DATA_DIR,data}/m2c_v2/videos
+
+siglip_feature_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/siglip/m2c_v2
+tren_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/tren/m2c_v2
+ocr_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr/m2c_v2
+ocr_judge_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr_judge/m2c_v2
+
+max_final_k: 8
+model_backend: qwen3vl
+
+answer_generator:
+  prompt_template: v1

@@ -1,0 +1,19 @@
+# Paper Table 2 — Video-MME (long split), GPT-4o answerer, 8 frames.
+
+defaults:
+  - ../default
+
+data:
+  input_path: ${oc.env:TOOLMERGE_DATA_DIR,data}/video_mme/video_mme_long.json
+  save_path: ${oc.env:TOOLMERGE_OUTPUT_DIR,outputs}/table2_vmme_gpt4o_8
+  video_dir: ${oc.env:TOOLMERGE_DATA_DIR,data}/video_mme/videos
+
+siglip_feature_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/siglip/video_mme
+tren_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/tren/video_mme
+ocr_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr/video_mme
+ocr_judge_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr_judge/video_mme
+
+max_final_k: 8
+model_backend: openai
+openai:
+  model_name: gpt-4o

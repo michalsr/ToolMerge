@@ -1,0 +1,30 @@
+# Tiny smoke run on M2M val — points at existing caches on Delta so we can
+# confirm the public repo runs end-to-end without rebuilding any caches.
+# Submit this with scripts/slurm/run_table.sbatch + TABLE=smoke_m2m_val.
+
+defaults:
+  - ../default
+
+model:
+  base: Qwen/Qwen3-VL-8B-Instruct
+  attn_implementation: flash_attention_2
+  device_map: auto
+
+data:
+  input_path: /work/hdd/bcgp/michal5/verify_video/multi_turn/evidence_pipeline_v2/dataset_generation/group_v2/val.json
+  save_path: ???                       # overridden by the Slurm launcher
+  video_dir: /work/hdd/bcgp/michal5/molmo2_cap/videos
+  video_backend: opencv
+
+siglip_feature_cache_dir: /work/hdd/bcgp/michal5/feature_cache/molmo2_cap/qwen3vl_256
+tren_cache_dir: /work/hdd/bcgp/michal5/tren_cache/molmo2_cap/qwen3vl_256
+ocr_cache_dir: /work/hdd/bcgp/michal5/ocr_cache/molmo2_cap/qwen3vl_256
+ocr_judge_cache_dir: /work/hdd/bcgp/michal5/ocr_judge_cache/molmo2_cap
+
+# OCR judge via Azure GPT-4o-mini (same secrets as the research-tree configs).
+ocr_llm_model: openai:gpt-4o-mini
+
+# Answerer = local Qwen3-VL-8B; planner reuses it.
+model_backend: qwen3vl
+
+max_final_k: 8

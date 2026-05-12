@@ -1,0 +1,88 @@
+# Inference config for GRPO training reward — LongVideoBench (Delta AI)
+#
+# This is a standard EvidencePipelineV2Config YAML used as the reward pipeline
+# during planner GRPO training. The planner fields below are IGNORED during
+# training (planner output comes from the GRPO rollout).
+#
+# Based on lvb_v7_no_temporal_t0_idk_dtai.yaml with training-specific changes:
+#   - answer_generator.prompt_template: lif (matches downstream eval — no IDK)
+#   - min_frame_gap_seconds: -1 (auto)
+#   - ocr_pool_seconds: -1 (auto)
+
+model:
+  base: Qwen/Qwen3-VL-8B-Instruct
+  attn_implementation: flash_attention_2
+  device_map: auto
+
+data:
+  input_path: /work/hdd/bcgp/michal5/verify_video/multi_turn/evidence_pipeline_v2/data/0406_clip_deduped_train.json
+  save_path: ${save_path}
+  video_dir: /work/hdd/bcgp/michal5/molmo2_cap/videos
+  video_backend: cv2
+  frame_cache_dir: ""
+  start_idx: 0
+  end_idx: null
+
+model_backend: qwen3vl
+qwen_version: qwen3
+
+# Planner — not used during training (planner output comes from GRPO rollout)
+planner_prompt: v7_no_temporal
+planner_max_new_tokens: 512
+planner_temperature: 0.0
+planner_do_sample: false
+planner_num_frames: 0
+
+# Tool scoring
+enabled_tools:
+  - siglip
+  - tren
+siglip_feature_cache_dir: /work/hdd/bcgp/michal5/feature_cache/molmo2_cap/qwen3vl_256
+tren_cache_dir: /work/hdd/bcgp/michal5/tren_cache/molmo2_cap/qwen3vl_256
+ocr_cache_dir: /work/hdd/bcgp/michal5/ocr_cache/molmo2_cap/qwen3vl_256
+ocr_judge_cache_dir: /work/hdd/bcgp/michal5/ocr_judge_cache/molmo2_cap
+
+# Thresholding — disabled (top-k only)
+score_threshold_mode: percentile
+score_threshold_value: 0.0
+min_frames_per_query: 16
+max_final_k: 8
+min_frame_gap_seconds: -1  # auto: duration/(max_final_k*2), cap 10s
+
+# Segment-based peak detection
+use_segment_detection: false
+peak_std_k: 2.0
+segment_mode: threshold_only
+peak_drop_pct: 0.10
+segment_merge_gap: 5
+
+# OCR LLM-judged
+ocr_llm_model: azure:gpt-4o-mini
+ocr_llm_max_tokens: 256
+ocr_batch_size: 20
+
+# OCR temporal pooling — auto
+ocr_pool_seconds: -1
+
+# Azure OpenAI settings
+azure:
+  api_endpoint: https://michalagentai.cognitiveservices.azure.com/openai/v1/
+  secrets_file: /work/hdd/bcgp/michal5/verify_video/multi_turn/evidence_pipeline_v2/config/secrets.env
+  use_azure: false
+
+# Answer generator — temperature 0, lif prompt (matches downstream eval)
+answer_generator:
+  prompt_template: lif
+  max_new_tokens: 128
+  temperature: 0.0
+  top_p: 1.0
+  top_k: 1
+  do_sample: false
+  mode: letter_only
+
+# General
+save_trace: true
+save_path: ${oc.env:SAVE_PATH,output/evidence_pipeline_v2/lvb_v7_t0_train}
+save_every_n: 5
+seed: 42
+debug: false
