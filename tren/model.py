@@ -12,10 +12,17 @@ from task_utils import CenterPadding, upsample_features
 logging.getLogger(__name__).setLevel(logging.WARNING)
 
 _TREN_DIR = os.path.dirname(os.path.abspath(__file__))
-# NOTE: Update these paths if running on a different machine.
-_DINOV3_REPO = '/work/hdd/bcgp/michal5/hub/facebookresearch_dinov3_main'
-_DINOV3_VITL16_WEIGHTS = os.path.join(_TREN_DIR, 'dinov3_vitl16_pretrain_lvd1689m-8aa4cbdd.pth')
-_DINOTXT_WEIGHTS = os.path.join(_TREN_DIR, 'dinov3_vitl16_dinotxt_vision_head_and_text_encoder-a442d8f5.pth')
+# Set DINOV3_REPO to a local clone of https://github.com/facebookresearch/dinov3
+# (torch.hub uses `source='local'` so a local clone is required).
+# Place the DINOv3 + DINO-Txt weights alongside this file under tren/weights/
+# (see scripts/download_tren_weights.sh).
+_DINOV3_REPO = os.environ.get('DINOV3_REPO', os.path.join(_TREN_DIR, 'dinov3'))
+_DINOV3_VITL16_WEIGHTS = os.path.join(
+    _TREN_DIR, 'weights', 'dinov3_vitl16_pretrain_lvd1689m-8aa4cbdd.pth',
+)
+_DINOTXT_WEIGHTS = os.path.join(
+    _TREN_DIR, 'weights', 'dinov3_vitl16_dinotxt_vision_head_and_text_encoder-a442d8f5.pth',
+)
 
 
 class FeatureExtractor(nn.Module):

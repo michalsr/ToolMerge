@@ -13,9 +13,6 @@ import os
 import sys
 from typing import Optional
 
-# Ensure project root is on path
-sys.path.insert(0, "/work/hdd/bcgp/michal5/verify_video/multi_turn")
-
 import torch
 # Disable torch.compile/dynamo to avoid symbolic shape errors with variable-length sequences
 torch._dynamo.config.disable = True

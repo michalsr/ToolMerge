@@ -42,5 +42,5 @@ tren:
     num_workers: 1
 
   logging:
-    save_dir: '/work/hdd/bcgp/michal5/verify_video/multi_turn/time_r1/t_ren/'
+    save_dir: 'outputs/tren/'
     exp_name: '.'

@@ -1,13 +1,8 @@
-# Inference config for GRPO training reward — LongVideoBench (Delta AI)
+# Inference config used at GRPO training reward time.
 #
-# This is a standard EvidencePipelineV2Config YAML used as the reward pipeline
-# during planner GRPO training. The planner fields below are IGNORED during
-# training (planner output comes from the GRPO rollout).
-#
-# Based on lvb_v7_no_temporal_t0_idk_dtai.yaml with training-specific changes:
-#   - answer_generator.prompt_template: lif (matches downstream eval — no IDK)
-#   - min_frame_gap_seconds: -1 (auto)
-#   - ocr_pool_seconds: -1 (auto)
+# Standard ToolMergeConfig YAML — the GRPO trainer calls the inference pipeline
+# with this config to score each rollout. The planner-* fields below are
+# IGNORED during training (the planner output comes from the rollout itself).
 
 model:
   base: Qwen/Qwen3-VL-8B-Instruct
@@ -15,9 +10,9 @@ model:
   device_map: auto
 
 data:
-  input_path: /work/hdd/bcgp/michal5/verify_video/multi_turn/evidence_pipeline_v2/data/0406_clip_deduped_train.json
+  input_path: ${oc.env:TOOLMERGE_DATA_DIR,data}/m2c_v2/train.json
   save_path: ${save_path}
-  video_dir: /work/hdd/bcgp/michal5/molmo2_cap/videos
+  video_dir: ${oc.env:TOOLMERGE_DATA_DIR,data}/m2c_v2/videos
   video_backend: cv2
   frame_cache_dir: ""
   start_idx: 0
@@ -26,7 +21,7 @@ data:
 model_backend: qwen3vl
 qwen_version: qwen3
 
-# Planner — not used during training (planner output comes from GRPO rollout)
+# Planner — ignored during training (rollout provides the plan).
 planner_prompt: v7_no_temporal
 planner_max_new_tokens: 512
 planner_temperature: 0.0
@@ -37,12 +32,12 @@ planner_num_frames: 0
 enabled_tools:
   - siglip
   - tren
-siglip_feature_cache_dir: /work/hdd/bcgp/michal5/feature_cache/molmo2_cap/qwen3vl_256
-tren_cache_dir: /work/hdd/bcgp/michal5/tren_cache/molmo2_cap/qwen3vl_256
-ocr_cache_dir: /work/hdd/bcgp/michal5/ocr_cache/molmo2_cap/qwen3vl_256
-ocr_judge_cache_dir: /work/hdd/bcgp/michal5/ocr_judge_cache/molmo2_cap
+siglip_feature_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/siglip/m2c_v2
+tren_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/tren/m2c_v2
+ocr_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr/m2c_v2
+ocr_judge_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr_judge/m2c_v2
 
-# Thresholding — disabled (top-k only)
+# Thresholding — disabled (top-k only).
 score_threshold_mode: percentile
 score_threshold_value: 0.0
 min_frames_per_query: 16
@@ -56,21 +51,13 @@ segment_mode: threshold_only
 peak_drop_pct: 0.10
 segment_merge_gap: 5
 
-# OCR LLM-judged
-ocr_llm_model: azure:gpt-4o-mini
+# OCR LLM-judged. Reads OPENAI_API_KEY / OPENAI_BASE_URL from env at runtime.
+ocr_llm_model: openai:gpt-4o-mini
 ocr_llm_max_tokens: 256
 ocr_batch_size: 20
-
-# OCR temporal pooling — auto
 ocr_pool_seconds: -1
 
-# Azure OpenAI settings
-azure:
-  api_endpoint: https://michalagentai.cognitiveservices.azure.com/openai/v1/
-  secrets_file: /work/hdd/bcgp/michal5/verify_video/multi_turn/evidence_pipeline_v2/config/secrets.env
-  use_azure: false
-
-# Answer generator — temperature 0, lif prompt (matches downstream eval)
+# Answer generator — lif prompt (matches downstream eval), temperature 0.
 answer_generator:
   prompt_template: lif
   max_new_tokens: 128
@@ -80,9 +67,8 @@ answer_generator:
   do_sample: false
   mode: letter_only
 
-# General
 save_trace: true
-save_path: ${oc.env:SAVE_PATH,output/evidence_pipeline_v2/lvb_v7_t0_train}
+save_path: ${oc.env:SAVE_PATH,${oc.env:TOOLMERGE_OUTPUT_DIR,outputs}/grpo_train_inference}
 save_every_n: 5
 seed: 42
 debug: false
