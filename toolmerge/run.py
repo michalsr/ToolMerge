@@ -227,6 +227,7 @@ def reanswer_one_item(item, uid, source_index, backend, cfg, extract_frames):
         raise KeyError(f"uid {uid!r} not in source index")
     k = int(cfg.max_final_k)
     indices = select_frames_from_source(source_index[uid], k)
+    indices = sorted(indices)  # answerer expects frames in temporal order, not pool-rank order
     fps = 2.0  # paper caches are at 2 FPS; matches research-tree reanswer
     timestamps = [idx / fps for idx in indices]
 

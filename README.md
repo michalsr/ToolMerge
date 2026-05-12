@@ -143,7 +143,7 @@ ${TOOLMERGE_CACHE_DIR}/
 ├── siglip/<dataset>/{video_id}.feature_cache_qwen3vl
 ├── tren/<dataset>/{video_id}.mp4.tren_pf_cache_qwen3vl
 ├── ocr/<dataset>/{video_id}.ocr_cache
-└── ocr_judge/<dataset>/{uid}.json          # filled on first inference call
+└── ocr_judge/<dataset>/{uid}.json          # see note below
 ```
 
 Build all three per-video caches for one dataset in a single GPU job:
@@ -160,6 +160,10 @@ python -m cache_build.build_caches \
 ```
 
 Each video takes ~2 min on an A100. LVB val (1337 videos, ~7 min avg) ≈ 12 GPU-hours. Slurm template at `cache_build/slurm/build_cache.sbatch`; per-tool commands and chunking flags in `cache_build/README.md`.
+
+### OCR judge cache (per-question)
+
+`ocr_judge/<dataset>/{uid}.json` is per-question and must be **pre-built before inference**. The paper datasets ship with these caches in the bundle; if you bring your own dataset you need to build them yourself.
 
 ## Training (planner GRPO)
 
