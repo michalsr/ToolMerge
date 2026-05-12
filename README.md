@@ -4,13 +4,18 @@ Public reproduction repo for **"Decomposing Queries into Tool Calls for Long-Vid
 
 ToolMerge is a keyframe-retrieval method for long-video QA. A text-only LLM planner decomposes the query into independent tool calls (SigLIP-2 for scene similarity, T-REN for region-text alignment), combines them with AND/OR boolean operators over per-tool ranks, injects OCR-confirmed frames, and applies greedy NMS with a temporal gap. The selected top-K frames are passed to a downstream answerer VLM (Qwen3-VL-8B or GPT-4o).
 
-The repo also releases **Molmo-2 Moments v2 (M2C-v2)**, a new long-video QA benchmark in which every question is anchored to a specific time interval by construction. See [Dataset](#dataset-molmo-2-moments-v2) below.
+The repo also releases two long-video evaluation sets:
+
+- **Molmo-2 Moments** (M2C-v2) — long-video QA where every question is anchored to a specific time interval. Used for Tables 2 (QA) and 3 (QA + ablations).
+- **Molmo-2 Captions** — 1000 caption + clip-interval pairs used for caption-retrieval evaluation (Table 5).
+
+See [Datasets](#datasets) below.
 
 ## Quick start
 
 ```bash
-git clone <repo-url> toolmerge
-cd toolmerge
+git clone https://github.com/michalsr/ToolMerge.git
+cd ToolMerge
 conda env create -f env/toolmerge.yaml
 conda activate toolmerge
 pip install -e .
@@ -30,7 +35,7 @@ mkdir -p scripts/slurm/logs
 sbatch scripts/slurm/lvb_qwen3_8f.sbatch
 
 # 3. ... or run locally on a single GPU (single-process; small slices only)
-python -m toolmerge.run config=configs/tables/table2_lvb_qwen3_8.yaml \
+toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
     data.start_idx=0 data.end_idx=10 \
     data.save_path=outputs/smoke_lvb
 ```
@@ -78,7 +83,7 @@ All per-row configs currently live under `configs/tables/` and follow:
 table{N}_{dataset}_{answerer}_{K}.yaml
 ```
 
-- `dataset`: `lvb` (Long Video Bench), `vmme` (Video-MME long), `m2c_v2` (Molmo-2 Moments v2)
+- `dataset`: `lvb` (Long Video Bench), `vmme` (Video-MME long), `m2c_v2` (Molmo-2 Moments)
 - `answerer`: `qwen3` (local Qwen3-VL-8B-Instruct) or `gpt4o` (Azure / OpenAI GPT-4o)
 - `K`: `8` or `32` (final keyframes)
 
@@ -183,27 +188,27 @@ command line via OmegaConf dotted paths — no extra flags. Examples:
 
 ```bash
 # Run only the first 50 items as a quick check
-python -m toolmerge.run config=configs/tables/table2_lvb_qwen3_8.yaml \
+toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
     data.start_idx=0 data.end_idx=50
 
 # Override K and the answerer prompt
-python -m toolmerge.run config=configs/tables/table2_lvb_qwen3_8.yaml \
+toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
     max_final_k=16 answer_generator.prompt_template=lif
 
 # Swap to a fine-tuned planner checkpoint
-python -m toolmerge.run config=configs/tables/table2_lvb_qwen3_8.yaml \
+toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
     model.base=/path/to/grpo-ckpt-step50
 
 # Reanswer a baseline's `keyframes.json` with the toolmerge answerer
-python -m toolmerge.run config=configs/tables/table2_lvb_qwen3_8.yaml \
+toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
     data.source_dir=outputs/wfs/table2_lvb_qwen3_8
 
 # Ablate a tool (drop OCR; keep SigLIP + T-REN)
-python -m toolmerge.run config=configs/tables/table2_lvb_qwen3_8.yaml \
+toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
     enabled_tools=[siglip,tren] ocr_cache_dir=""
 
 # Resume a partial run — pick up where results.json left off (no flag needed)
-python -m toolmerge.run config=configs/tables/table2_lvb_qwen3_8.yaml \
+toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
     data.save_path=outputs/table2_lvb_qwen3_8     # same path as before
 ```
 
@@ -215,11 +220,11 @@ A `toolmerge.run` invocation runs the full planner → tools → merge → NMS �
 
 ```bash
 # 1. Full pipeline at K=8 (saves trace with pooled_candidates_{8,16,32,64})
-python -m toolmerge.run config=configs/tables/table2_lvb_qwen3_8.yaml \
+toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
     data.save_path=outputs/table2_lvb_qwen3_8
 
 # 2. Reanswer the same questions at K=32 — only the answerer runs
-python -m toolmerge.run config=configs/tables/table2_lvb_qwen3_32.yaml \
+toolmerge config=configs/tables/table2_lvb_qwen3_32.yaml \
     data.source_dir=outputs/table2_lvb_qwen3_8 \
     data.save_path=outputs/table2_lvb_qwen3_32
 ```
@@ -238,7 +243,7 @@ python -m baselines.uniform.run config=configs/tables/table2_lvb_qwen3_8.yaml \
     data.save_path=outputs/uniform_lvb_8
 
 # 2. Run the toolmerge answerer over those keyframes
-python -m toolmerge.run config=configs/tables/table2_lvb_qwen3_8.yaml \
+toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
     data.source_dir=outputs/uniform_lvb_8 \
     data.save_path=outputs/uniform_lvb_8_answered
 ```
@@ -256,17 +261,21 @@ python -m toolmerge.run config=configs/tables/table2_lvb_qwen3_8.yaml \
 
 Per-baseline invocation details and the shared `keyframes.json` schema are in `baselines/README.md`.
 
-## Dataset (Molmo-2 Moments v2)
+## Datasets
 
-`m2c_v2` is a long-video QA dataset where every question is grounded in a specific `[start, end]` interval of the video. The dataset files live under `${TOOLMERGE_DATA_DIR}/m2c_v2/`:
+Two evaluation sets ship with this repo, both anchored to per-question time intervals.
+
+### Molmo-2 Moments (`m2c_v2`)
+
+Long-video QA — every question has a `[start, end]` ground-truth clip. Used for Tables 2 / 3 and the GRPO training signal.
 
 ```
-m2c_v2/
-  test.json                  # questions + clip intervals
+${TOOLMERGE_DATA_DIR}/m2c_v2/
+  test.json                  # QA + clip intervals
   videos/                    # source mp4 files
 ```
 
-Each item in `test.json` has the schema:
+Item schema:
 
 ```json
 {
@@ -275,12 +284,36 @@ Each item in `test.json` has the schema:
   "question": "...",
   "options": {"A": "...", "B": "...", "C": "...", "D": "..."},
   "answer": "C",
-  "start": 12.5,
+  "start": 12.5,                       // seconds
   "end": 47.8
 }
 ```
 
-`start` / `end` are in seconds. The Oracle baseline uses these intervals as an upper-bound reference (`baselines/oracle/run.py`).
+The Oracle baseline (`baselines/oracle/run.py`) uses the intervals as an upper-bound reference.
+
+### Molmo-2 Captions
+
+1000 caption + clip-interval pairs used for caption retrieval (Table 5). The "question" field carries the caption text and `options` is empty.
+
+```
+${TOOLMERGE_DATA_DIR}/m2c_v2/captions_1k.json
+```
+
+Item schema:
+
+```json
+{
+  "uid": "<video_id>_<idx>",
+  "video_id": "abc123",
+  "question": "<caption text>",
+  "options": {},
+  "answer": "A",
+  "start": "00:06:28.321",             // HH:MM:SS.mmm
+  "end":   "00:08:19.832"
+}
+```
+
+Caption retrieval scores hit@K over the planner's selected frames vs the GT interval — see `configs/tables/table5_caption_retrieval.yaml`.
 
 ## Bring your own dataset
 
@@ -324,7 +357,7 @@ To run ToolMerge on a new dataset:
 
 4. **Run it**:
    ```bash
-   python -m toolmerge.run config=configs/tables/table2_your_dataset_qwen3_8.yaml
+   toolmerge config=configs/tables/table2_your_dataset_qwen3_8.yaml
    ```
 
 ## License
