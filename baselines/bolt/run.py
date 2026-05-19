@@ -1,14 +1,17 @@
-"""SigLIP-Q baseline.
+"""BOLT baseline.
 
-Encodes ``question + concatenated answer choices`` with SigLIP-2, scores every
-video frame by raw cosine similarity, then applies greedy NMS with the paper's
-auto-tau = min(D/(2K), 10s) rule.
+BOLT (CVPR 2025) inverse-transform sampling on a per-frame relevance curve.
+We compute the curve as raw SigLIP-2 cosine similarity between the
+``question + concatenated options`` query and the cached frame embeddings,
+then sample K indices from the relevance CDF.
 
-Standalone: no imports from ``toolmerge``. The greedy NMS implementation is
-copied verbatim from ``toolmerge/selection.py`` so this file runs on its own.
+Standalone: no imports from ``toolmerge``. The ``inverse_transform_sampling``
+function is copied verbatim from
+https://github.com/sming256/BOLT/blob/main/select_frames.py (lines 76-94 in
+the local clone at /work/hdd/bcgp/michal5/BOLT/select_frames.py).
 
 Usage:
-    python -m baselines.siglip_q.run config=configs/tables/table2_lvb_qwen3_8.yaml
+    python -m baselines.bolt.run config=configs/tables/table2_lvb_qwen3_8.yaml
 """
 
 from __future__ import annotations
@@ -19,7 +22,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import torch
@@ -32,11 +35,6 @@ logger = logging.getLogger(__name__)
 # --------------------------- config loader (OmegaConf) ---------------------------
 
 def load_config_from_cli() -> Any:
-    """Read `config=path.yaml` plus dotted `key=value` overrides from sys.argv.
-
-    Resolves an optional ``defaults: [- relative/path]`` block one level deep,
-    matching the layout under ``configs/tables/``.
-    """
     config_path: Optional[str] = None
     overrides: List[str] = []
     for arg in sys.argv[1:]:
@@ -45,9 +43,7 @@ def load_config_from_cli() -> Any:
         elif "=" in arg:
             overrides.append(arg)
     if not config_path:
-        raise SystemExit(
-            "usage: python -m baselines.siglip_q.run config=<yaml> [k=v ...]"
-        )
+        raise SystemExit("usage: python -m baselines.bolt.run config=<yaml> [k=v ...]")
 
     def _load(p: str):
         cfg = OmegaConf.load(p)
@@ -76,7 +72,6 @@ _TEXT_DEVICE: Optional[str] = None
 
 
 def encode_text(query: str, model_name: Optional[str] = None) -> torch.Tensor:
-    """Returns a (D,) L2-normalized SigLIP-2 text embedding."""
     global _TEXT_MODEL, _TEXT_PROCESSOR, _TEXT_DEVICE
     if _TEXT_MODEL is None:
         from transformers import AutoModel, AutoProcessor
@@ -115,7 +110,6 @@ def find_siglip_cache(cache_dir: str, video_id: str) -> Optional[str]:
 
 
 def load_siglip_embeddings(path: str) -> torch.Tensor:
-    """Returns the (T, D) SigLIP-2 image-embedding tensor at ``path``."""
     obj = torch.load(path, map_location="cpu", weights_only=False)
     if isinstance(obj, torch.Tensor):
         return obj
@@ -144,7 +138,6 @@ def item_uid(item: dict) -> str:
 # --------------------------- query + raw cosine ---------------------------
 
 def build_query(item: dict) -> str:
-    """Question + concatenated option values, alphabetical, no letters."""
     opts = item.get("options") or {}
     if isinstance(opts, dict):
         opts_text = " ".join(opts[k] for k in sorted(opts.keys()))
@@ -154,43 +147,57 @@ def build_query(item: dict) -> str:
 
 
 def siglip_cosine(query: str, embeddings: torch.Tensor) -> np.ndarray:
-    """Per-frame raw cosine similarity (no percentile normalization)."""
     text_feat = encode_text(query)
     text_feat = F.normalize(text_feat.unsqueeze(0), p=2, dim=1).squeeze(0)
     emb = F.normalize(embeddings.float(), p=2, dim=1)
     return (emb @ text_feat).detach().cpu().numpy().astype(float)
 
 
-# --------------------------- selector: greedy NMS ---------------------------
-# Copied verbatim from toolmerge/selection.py so this file is standalone.
+# --------------------------- selector: BOLT inverse-transform sampling ---------------------------
+# Copied verbatim from https://github.com/sming256/BOLT/blob/main/select_frames.py
+# (local clone: /work/hdd/bcgp/michal5/BOLT/select_frames.py lines 76-94).
 
-def auto_tau_seconds(num_frames: int, fps: float, max_k: int, cap: float = 10.0) -> float:
-    """Paper's default tau = min(D/(2K), cap) in seconds."""
-    if fps <= 0 or max_k <= 0:
-        return 0.0
-    duration = num_frames / fps
-    return min(duration / (2 * max_k), cap)
+def inverse_transform_sampling(score, n, power=-1):
+    # normalize the score to 0-1
+    score = score - np.min(score)
+    score = score / np.max(score)
+
+    # power
+    if power != -1:
+        score = score**power
+
+    # compute the cumulative distribution function (CDF)
+    probabilities = score / np.sum(score)
+    cdf = np.cumsum(probabilities)
+
+    # generate uniform values between 0 and 1, exclude the 0 and 1 to avoid out of bounds
+    uniform_sampling = np.linspace(1 / n, 1 - 1 / n, n)
+
+    # use the inverse CDF to convert the uniform_sampling to indices
+    sampled_indices = np.searchsorted(cdf, uniform_sampling)
+    return sampled_indices
 
 
-def greedy_gap_select(scored: Dict[int, float], max_k: int, min_gap_frames: int) -> Dict[int, float]:
-    """Greedy top-K with a per-frame temporal gap constraint."""
-    ranked = sorted(scored.items(), key=lambda x: x[1], reverse=True)
-    selected: Dict[int, float] = {}
-    for idx, score in ranked:
-        if len(selected) >= max_k:
-            break
-        if min_gap_frames <= 0 or all(abs(idx - s) >= min_gap_frames for s in selected):
-            selected[idx] = score
-    return selected
-
-
-def ordered_by_time(selected: Dict[int, float]) -> List[int]:
-    return sorted(selected.keys())
+def bolt_select(scores: np.ndarray, k: int, power: float = -1.0) -> List[int]:
+    """ITS with degenerate-input guard + budget padding."""
+    if len(scores) <= k:
+        return list(range(len(scores)))
+    rng = float(scores.max()) - float(scores.min())
+    if rng <= 0:
+        return [int(i) for i in np.linspace(0, len(scores) - 1, k, dtype=int).tolist()]
+    sampled = inverse_transform_sampling(scores.astype(float), k, power)
+    sampled = np.clip(sampled, 0, len(scores) - 1)
+    dedup = sorted(set(int(x) for x in sampled.tolist()))
+    if len(dedup) < k:
+        fill = np.linspace(0, len(scores) - 1, k, dtype=int).tolist()
+        merged = sorted(set(dedup + [int(x) for x in fill]))
+        dedup = merged[:k]
+    return dedup[:k]
 
 
 # --------------------------- per-item driver ---------------------------
 
-def run_one(item: dict, cache_dir: str, k: int, cap_seconds: float = 10.0) -> Dict[str, Any]:
+def run_one(item: dict, cache_dir: str, k: int, power: float = -1.0) -> Dict[str, Any]:
     video_id = item["video_id"]
     uid = item_uid(item)
     cache_path = find_siglip_cache(cache_dir, video_id)
@@ -198,15 +205,10 @@ def run_one(item: dict, cache_dir: str, k: int, cap_seconds: float = 10.0) -> Di
         raise FileNotFoundError(f"SigLIP cache missing for {video_id} in {cache_dir}")
     embeddings = load_siglip_embeddings(cache_path)
     num_frames = embeddings.shape[0]
-    fps = 2.0  # cache native fps from cache_build/
+    fps = 2.0
 
     scores = siglip_cosine(build_query(item), embeddings)
-    score_map = {i: float(scores[i]) for i in range(num_frames)}
-
-    tau = auto_tau_seconds(num_frames, fps, k, cap_seconds)
-    gap_frames = int(tau * fps) if tau > 0 else 0
-    selected = greedy_gap_select(score_map, k, gap_frames)
-    indices = ordered_by_time(selected)
+    indices = sorted(bolt_select(scores, k, power))
     timestamps = [idx / fps for idx in indices]
 
     return {
@@ -235,14 +237,14 @@ def main():
     )
     cache_dir = str(cfg.siglip_feature_cache_dir)
     k = int(cfg.max_final_k)
-    cap_seconds = float(cfg.get("min_frame_gap_cap_seconds", 10.0))
+    power = float(cfg.get("bolt_power", -1.0))
 
-    logger.info("SigLIP-Q on %d items, K=%d, cache=%s", len(items), k, cache_dir)
+    logger.info("BOLT on %d items, K=%d, power=%s, cache=%s", len(items), k, power, cache_dir)
     results: List[Dict[str, Any]] = []
     t0 = time.time()
     for i, item in enumerate(items):
         try:
-            r = run_one(item, cache_dir, k, cap_seconds)
+            r = run_one(item, cache_dir, k, power)
             results.append(r)
             logger.info(
                 "[%d/%d] %s uid=%s -> %d frames",

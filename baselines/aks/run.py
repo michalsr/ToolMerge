@@ -1,25 +1,39 @@
-"""SigLIP-Q baseline.
+"""AKS baseline.
 
-Encodes ``question + concatenated answer choices`` with SigLIP-2, scores every
-video frame by raw cosine similarity, then applies greedy NMS with the paper's
-auto-tau = min(D/(2K), 10s) rule.
+AKS (CVPR 2025) Adaptive Keyframe Sampling. We compute the per-frame
+relevance curve as raw SigLIP-2 cosine similarity between the
+``question + concatenated options`` query and the cached frame embeddings,
+then recursively split the curve and take top-N per surviving segment.
 
-Standalone: no imports from ``toolmerge``. The greedy NMS implementation is
-copied verbatim from ``toolmerge/selection.py`` so this file runs on its own.
+Standalone: no imports from ``toolmerge``. The ``meanstd`` recursive
+split + ``aks`` driver are copied verbatim from upstream AKS
+(https://github.com/ncTimTang/AKS/blob/main/frame_select.py).
+
+Hyperparameters (paper defaults):
+    t1 = 0.8          # peakiness threshold (mean(top-n) - mean)
+    t2 = -100         # std lower bound (effectively unconstrained)
+    all_depth = min(5, floor(log2(K)))
+        The canonical paper value is 5, which yields 2^5 = 32 segments. With
+        a smaller budget (e.g. K=8) the paper rule allocates K / 2^depth =
+        floor(8 / 32) = 0 frames per segment, falling back to uniform. We
+        adapt all_depth = min(5, floor(log2(K))) so AKS remains
+        score-driven at every K.
 
 Usage:
-    python -m baselines.siglip_q.run config=configs/tables/table2_lvb_qwen3_8.yaml
+    python -m baselines.aks.run config=configs/tables/table2_lvb_qwen3_8.yaml
 """
 
 from __future__ import annotations
 
+import heapq
 import json
 import logging
+import math
 import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
 import torch
@@ -32,11 +46,6 @@ logger = logging.getLogger(__name__)
 # --------------------------- config loader (OmegaConf) ---------------------------
 
 def load_config_from_cli() -> Any:
-    """Read `config=path.yaml` plus dotted `key=value` overrides from sys.argv.
-
-    Resolves an optional ``defaults: [- relative/path]`` block one level deep,
-    matching the layout under ``configs/tables/``.
-    """
     config_path: Optional[str] = None
     overrides: List[str] = []
     for arg in sys.argv[1:]:
@@ -45,9 +54,7 @@ def load_config_from_cli() -> Any:
         elif "=" in arg:
             overrides.append(arg)
     if not config_path:
-        raise SystemExit(
-            "usage: python -m baselines.siglip_q.run config=<yaml> [k=v ...]"
-        )
+        raise SystemExit("usage: python -m baselines.aks.run config=<yaml> [k=v ...]")
 
     def _load(p: str):
         cfg = OmegaConf.load(p)
@@ -76,7 +83,6 @@ _TEXT_DEVICE: Optional[str] = None
 
 
 def encode_text(query: str, model_name: Optional[str] = None) -> torch.Tensor:
-    """Returns a (D,) L2-normalized SigLIP-2 text embedding."""
     global _TEXT_MODEL, _TEXT_PROCESSOR, _TEXT_DEVICE
     if _TEXT_MODEL is None:
         from transformers import AutoModel, AutoProcessor
@@ -115,7 +121,6 @@ def find_siglip_cache(cache_dir: str, video_id: str) -> Optional[str]:
 
 
 def load_siglip_embeddings(path: str) -> torch.Tensor:
-    """Returns the (T, D) SigLIP-2 image-embedding tensor at ``path``."""
     obj = torch.load(path, map_location="cpu", weights_only=False)
     if isinstance(obj, torch.Tensor):
         return obj
@@ -144,7 +149,6 @@ def item_uid(item: dict) -> str:
 # --------------------------- query + raw cosine ---------------------------
 
 def build_query(item: dict) -> str:
-    """Question + concatenated option values, alphabetical, no letters."""
     opts = item.get("options") or {}
     if isinstance(opts, dict):
         opts_text = " ".join(opts[k] for k in sorted(opts.keys()))
@@ -154,43 +158,91 @@ def build_query(item: dict) -> str:
 
 
 def siglip_cosine(query: str, embeddings: torch.Tensor) -> np.ndarray:
-    """Per-frame raw cosine similarity (no percentile normalization)."""
     text_feat = encode_text(query)
     text_feat = F.normalize(text_feat.unsqueeze(0), p=2, dim=1).squeeze(0)
     emb = F.normalize(embeddings.float(), p=2, dim=1)
     return (emb @ text_feat).detach().cpu().numpy().astype(float)
 
 
-# --------------------------- selector: greedy NMS ---------------------------
-# Copied verbatim from toolmerge/selection.py so this file is standalone.
+# --------------------------- selector: AKS recursive split ---------------------------
+# Copied verbatim from https://github.com/ncTimTang/AKS/blob/main/frame_select.py
+# Same as /work/hdd/bcgp/michal5/verify_video/aks.py.
 
-def auto_tau_seconds(num_frames: int, fps: float, max_k: int, cap: float = 10.0) -> float:
-    """Paper's default tau = min(D/(2K), cap) in seconds."""
-    if fps <= 0 or max_k <= 0:
-        return 0.0
-    duration = num_frames / fps
-    return min(duration / (2 * max_k), cap)
+def meanstd(len_scores, dic_scores, n, fns, t1, t2, all_depth):
+    split_scores = []
+    split_fn = []
+    no_split_scores = []
+    no_split_fn = []
+    for dic_score, fn in zip(dic_scores, fns):
+        score = dic_score['score']
+        depth = dic_score['depth']
+        mean = float(np.mean(score))
+        std = float(np.std(score))
+        top_n = heapq.nlargest(n, range(len(score)), score.__getitem__)
+        top_score = [score[t] for t in top_n]
+        mean_diff = float(np.mean(top_score)) - mean
+        if mean_diff > t1 and std > t2:
+            no_split_scores.append(dic_score)
+            no_split_fn.append(fn)
+        elif depth < all_depth:
+            score1 = score[:len(score) // 2]
+            score2 = score[len(score) // 2:]
+            fn1 = fn[:len(score) // 2]
+            fn2 = fn[len(score) // 2:]
+            split_scores.append(dict(score=score1, depth=depth + 1))
+            split_scores.append(dict(score=score2, depth=depth + 1))
+            split_fn.append(fn1)
+            split_fn.append(fn2)
+        else:
+            no_split_scores.append(dic_score)
+            no_split_fn.append(fn)
+    if split_scores:
+        rec_scores, rec_fn = meanstd(len_scores, split_scores, n, split_fn, t1, t2, all_depth)
+    else:
+        rec_scores, rec_fn = [], []
+    return no_split_scores + rec_scores, no_split_fn + rec_fn
 
 
-def greedy_gap_select(scored: Dict[int, float], max_k: int, min_gap_frames: int) -> Dict[int, float]:
-    """Greedy top-K with a per-frame temporal gap constraint."""
-    ranked = sorted(scored.items(), key=lambda x: x[1], reverse=True)
-    selected: Dict[int, float] = {}
-    for idx, score in ranked:
-        if len(selected) >= max_k:
-            break
-        if min_gap_frames <= 0 or all(abs(idx - s) >= min_gap_frames for s in selected):
-            selected[idx] = score
-    return selected
+def aks(scores: Sequence[float], frame_numbers: Sequence[int],
+        ratio: int = 1, t1: float = 0.8, t2: float = -100.0,
+        all_depth: int = 5, max_num_frames: int = 16) -> List[int]:
+    """Run AKS on a 1-D relevance curve, return native frame indices."""
+    score = list(scores)[::ratio]
+    fn = list(frame_numbers)[::ratio]
+    num = max_num_frames
+    if len(score) < num:
+        return list(fn)
 
+    arr = np.asarray(score, dtype=float)
+    rng = arr.max() - arr.min()
+    if rng <= 0:
+        normalized = np.zeros_like(arr)
+    else:
+        normalized = (arr - arr.min()) / rng
 
-def ordered_by_time(selected: Dict[int, float]) -> List[int]:
-    return sorted(selected.keys())
+    segs, seg_fns = meanstd(
+        len(score),
+        [dict(score=normalized.tolist(), depth=0)],
+        num, [fn], t1, t2, all_depth,
+    )
+
+    out: List[int] = []
+    for seg, f in zip(segs, seg_fns):
+        if not seg['score'] or not f:
+            continue
+        f_num = int(num / (2 ** seg['depth']))
+        if f_num <= 0:
+            continue
+        topk = heapq.nlargest(f_num, range(len(seg['score'])), seg['score'].__getitem__)
+        out.extend(int(f[t]) for t in topk)
+    return sorted(set(out))
 
 
 # --------------------------- per-item driver ---------------------------
 
-def run_one(item: dict, cache_dir: str, k: int, cap_seconds: float = 10.0) -> Dict[str, Any]:
+def run_one(item: dict, cache_dir: str, k: int,
+            t1: float = 0.8, t2: float = -100.0,
+            all_depth: Optional[int] = None) -> Dict[str, Any]:
     video_id = item["video_id"]
     uid = item_uid(item)
     cache_path = find_siglip_cache(cache_dir, video_id)
@@ -198,15 +250,23 @@ def run_one(item: dict, cache_dir: str, k: int, cap_seconds: float = 10.0) -> Di
         raise FileNotFoundError(f"SigLIP cache missing for {video_id} in {cache_dir}")
     embeddings = load_siglip_embeddings(cache_path)
     num_frames = embeddings.shape[0]
-    fps = 2.0  # cache native fps from cache_build/
+    fps = 2.0
 
     scores = siglip_cosine(build_query(item), embeddings)
-    score_map = {i: float(scores[i]) for i in range(num_frames)}
 
-    tau = auto_tau_seconds(num_frames, fps, k, cap_seconds)
-    gap_frames = int(tau * fps) if tau > 0 else 0
-    selected = greedy_gap_select(score_map, k, gap_frames)
-    indices = ordered_by_time(selected)
+    if all_depth is None:
+        all_depth = min(5, max(1, int(math.log2(k))))
+    indices = aks(
+        scores=scores.tolist(),
+        frame_numbers=list(range(num_frames)),
+        ratio=1, t1=t1, t2=t2, all_depth=all_depth, max_num_frames=k,
+    )
+
+    # Pad with uniform fill if fewer than K were selected (small video or low all_depth).
+    if len(indices) < k and num_frames > 0:
+        fill = np.linspace(0, num_frames - 1, k, dtype=int).tolist()
+        indices = sorted(set(indices + [int(x) for x in fill]))[:k]
+    indices = sorted(indices)
     timestamps = [idx / fps for idx in indices]
 
     return {
@@ -235,14 +295,19 @@ def main():
     )
     cache_dir = str(cfg.siglip_feature_cache_dir)
     k = int(cfg.max_final_k)
-    cap_seconds = float(cfg.get("min_frame_gap_cap_seconds", 10.0))
+    t1 = float(cfg.get("aks_t1", 0.8))
+    t2 = float(cfg.get("aks_t2", -100.0))
+    all_depth = cfg.get("aks_all_depth", None)
+    if all_depth is not None:
+        all_depth = int(all_depth)
 
-    logger.info("SigLIP-Q on %d items, K=%d, cache=%s", len(items), k, cache_dir)
+    logger.info("AKS on %d items, K=%d, t1=%s, t2=%s, all_depth=%s, cache=%s",
+                len(items), k, t1, t2, all_depth, cache_dir)
     results: List[Dict[str, Any]] = []
     t0 = time.time()
     for i, item in enumerate(items):
         try:
-            r = run_one(item, cache_dir, k, cap_seconds)
+            r = run_one(item, cache_dir, k, t1, t2, all_depth)
             results.append(r)
             logger.info(
                 "[%d/%d] %s uid=%s -> %d frames",

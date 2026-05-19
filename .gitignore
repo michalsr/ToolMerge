@@ -38,6 +38,8 @@ wandb/
 
 # Model weights and large data (host on HF Hub, not git)
 tren/weights/*.pth
+tren/*.pth
+tren/dinov3
 training/data/checkpoints/
 **/*.safetensors
 
@@ -66,4 +68,15 @@ scripts/slurm/lvb_qwen3_*.sbatch
 scripts/slurm/vmme_qwen3_*.sbatch
 scripts/slurm/m2c_v2_qwen3_*.sbatch
 scripts/slurm/*_gpt4o_*.sbatch
+scripts/slurm/lvb_siglip_q_*.sbatch
+scripts/slurm/lvb_wfs_*.sbatch
+scripts/slurm/lvb_bolt_*.sbatch
+scripts/slurm/baselines_*.sbatch
+scripts/slurm/test_*.sbatch
+scripts/slurm/caption_retrieval_*.sbatch
 training/slurm/train_grpo.sbatch
+
+# Internal analysis / determinism debug scripts (Delta-path hardcoded)
+scripts/analysis/
+scripts/test_planner_determinism.py
+scripts/test_tren_determinism.py

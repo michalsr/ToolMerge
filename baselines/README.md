@@ -1,61 +1,90 @@
 # Baselines
 
-ToolMerge compares against four prior keyframe selectors and four simple
-baselines. Every baseline emits a **keyframes JSON** in the same format; the
-shared ``toolmerge/answerer.py`` then runs the answerer (Qwen3-VL or GPT-4o)
-on those frames. Splitting selection from answering means table accuracies
-depend only on which keyframes a baseline picked.
+Frame-selection methods compared against ToolMerge. Every baseline writes
+`keyframes.json` in the same schema; the shared answerer in `toolmerge.run`
+then scores QA accuracy on the selected frames.
 
-| Baseline | Source | Paper tables | Conda env |
-|---|---|---|---|
-| Blind Text | in-house | 2, 3 | toolmerge |
-| Uniform | in-house | 2, 3, 4, 5 | toolmerge |
-| Oracle (M2M only) | in-house | 3 | toolmerge |
-| SigLIP-Q | in-house | 2, 3, 4, 5 | toolmerge |
-| AKS (CVPR 2025) | vendored from WFS-SB | 2, 3, 4, 5 | toolmerge |
-| BOLT (CVPR 2025) | vendored: WFS-SB/scripts/bolt_to_reanswer.py | 2, 3, 4, 5 | toolmerge |
-| WFS (CVPR 2026) | vendored from upstream WFS-SB | 2, 3, 4, 5 | toolmerge |
-| LIF (NeurIPS 2025) | vendored from Logic-in-Frames | 2, 3, 4, 5 | **toolmerge-lif** (separate; see env/lif.yaml) |
+| Baseline       | Algorithm                                                    | Source                                              |
+|----------------|--------------------------------------------------------------|-----------------------------------------------------|
+| `blind_text/`  | no frames (text-only LLM)                                    | in-house                                            |
+| `uniform/`     | linspace over the full video                                 | in-house                                            |
+| `oracle/`      | linspace within the GT clip (M2M only)                       | in-house                                            |
+| `siglip_q/`    | SigLIP-2 cosine → greedy NMS                                 | in-house                                            |
+| `aks/`         | SigLIP-2 cosine → recursive split + top-k per segment        | CVPR 2025, https://github.com/ncTimTang/AKS         |
+| `bolt/`        | SigLIP-2 cosine → inverse-transform sampling on the CDF      | CVPR 2025, https://github.com/sming256/BOLT         |
+| `wfs/`         | SigLIP-2 cosine → wavelet event detection + MMR              | CVPR 2026, https://github.com/MAC-AutoML/WFS-SB     |
+| `lif/`         | YOLO-World detection + T*-style search                       | NeurIPS 2025 (see `lif/README.md`, separate env)    |
 
-MDP3 and AIR (Table 11 of the paper) have no public code and are NOT
-vendored here — those accuracies are cited from the AIR paper itself.
+## Common pipeline (siglip_q, aks, bolt, wfs)
 
-## Common keyframes JSON
+These four share the first two steps and differ only in step 3:
 
-Every baseline writes the same per-question record so the shared answerer
-can be run uniformly:
+1. **Query**: `"<question> <opt1> <opt2> ..."` — question + concatenated
+   option values, sorted alphabetically, no letters.
+2. **Relevance curve**: encode the query with SigLIP-2, take per-frame
+   cosine similarity against the cached frame embeddings. Scores are used
+   **raw** — no percentile normalization.
+3. **Selector**: method-specific (see the corresponding `run.py` for the
+   inlined upstream algorithm).
+
+Each `run.py` is fully standalone — no imports from `toolmerge`. SigLIP-Q's
+greedy NMS is copied inline; WFS / AKS / BOLT algorithm code is copied
+verbatim from each upstream repo with a citation comment above the block.
+
+## Output schema
 
 ```json
 {
   "uid": "abc123_0",
   "video_id": "abc123",
   "question": "...",
-  "options": {"A": "...", ...},
+  "options": {"A": "...", "B": "...", "C": "...", "D": "..."},
   "ground_truth": "C",
-  "frames_used": [60, 81, 125, 152, 194, 267, 306, 326],
-  "timestamps_used": [30.0, 40.5, 62.5, 76.0, 97.0, 133.5, 153.0, 163.0]
+  "frames_used":      [60, 81, 125, 152, 194, 267, 306, 326],
+  "timestamps_used":  [30.0, 40.5, 62.5, 76.0, 97.0, 133.5, 153.0, 163.0]
 }
 ```
 
-## Running
+## Cached SigLIP-2 features
+
+Each baseline reads its frame embeddings from
+`${TOOLMERGE_CACHE_DIR}/siglip/<dataset>/{video_id}.feature_cache_qwen3vl`.
+Build the caches with `cache_build/build_caches.py --tools siglip ...`. See
+the top-level README for the full build invocation.
+
+## Run a baseline
 
 ```bash
-# 1. Pick keyframes with a baseline.
-./baselines/wfs/run.sh table4_m2m_retrieval
-
-# 2. Run the shared answerer on those keyframes.
-python -m toolmerge.run reanswer \
-    --keyframes outputs/wfs/table4_m2m_retrieval/keyframes.json \
-    --config configs/tables/table4_m2m_retrieval.yaml
+python -m baselines.siglip_q.run config=configs/tables/table2_lvb_qwen3_8.yaml
+python -m baselines.wfs.run      config=configs/tables/table2_lvb_qwen3_8.yaml
+python -m baselines.aks.run      config=configs/tables/table2_lvb_qwen3_8.yaml
+python -m baselines.bolt.run     config=configs/tables/table2_lvb_qwen3_8.yaml
 ```
 
-(LIF: switch to the ``toolmerge-lif`` conda env first; see ``env/lif.yaml``
-+ ``baselines/lif/README.md`` for the required PyTorch source patch.)
+Each writes `<cfg.data.save_path>/keyframes.json`. CLI overrides
+(`data.save_path=...`, `max_final_k=32`, ...) work the same way as
+`toolmerge.run`.
 
-## LIF's PyTorch source patch
+## Reanswer with the shared answerer
 
-The LIF baseline pins ``mmcv-full==1.7.0``, which doesn't build cleanly
-against newer PyTorch releases. The LIF authors' workaround is a small edit
-to ``torch/_C/__init__.pyi`` after ``pip install``. The exact patch is
-documented in ``baselines/lif/README.md`` (carried over from the upstream
-Logic-in-Frames repo).
+Once a baseline has produced `keyframes.json`, feed it to the shared
+answerer by setting `data.source_dir` to the baseline's output directory:
+
+```bash
+python -m toolmerge.run \
+    config=configs/tables/table2_lvb_qwen3_8.yaml \
+    data.source_dir=<baseline_save_path> \
+    data.save_path=<baseline_save_path>/reanswered
+```
+
+`data.source_dir` reads `frames_used` from `keyframes.json` (or
+`pooled_candidates_K` from a prior `results.json`) and runs only the
+answerer (Qwen3-VL or GPT-4o per the config), skipping planner/tools.
+
+## LIF
+
+LIF requires a separate conda env (`toolmerge-lif`) due to a
+`mmcv-full==1.7.0` incompatibility with newer PyTorch; see
+`lif/README.md` for the env setup and PyTorch source patch. Once LIF has
+written `keyframes.json`, the same `data.source_dir=` reanswer flow above
+applies.

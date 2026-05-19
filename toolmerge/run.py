@@ -255,6 +255,7 @@ def reanswer_one_item(item, uid, source_index, backend, cfg, extract_frames):
 
 def set_seed(seed: int) -> None:
     import random
+    os.environ["PYTHONHASHSEED"] = str(seed)
     random.seed(seed)
     try:
         import numpy as np
@@ -264,6 +265,11 @@ def set_seed(seed: int) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+    try:
+        from transformers import set_seed as hf_set_seed
+        hf_set_seed(seed)
+    except ImportError:
+        pass
 
 
 # --- Main loop -----------------------------------------------------------

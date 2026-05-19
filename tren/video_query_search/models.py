@@ -328,7 +328,7 @@ class VisualQueryEncoder(nn.Module):
         else:
             print('No checkpoint found, exiting.')
             exit()
-    
+
     def select_best_overlapping_region(self, region_masks, query_bbox, frame_resolution):
         best_match_idx = None
         best_match_iou = 0

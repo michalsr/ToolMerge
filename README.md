@@ -1,13 +1,13 @@
 # ToolMerge
 
-Public reproduction repo for **"Decomposing Queries into Tool Calls for Long-Video Keyframe Retrieval"**.
+Code repo for **"Decomposing Queries into Tool Calls for Long-Video Keyframe Retrieval"**.
 
 ToolMerge is a keyframe-retrieval method for long-video QA. A text-only LLM planner decomposes the query into independent tool calls (SigLIP-2 for scene similarity, T-REN for region-text alignment), combines them with AND/OR boolean operators over per-tool ranks, injects OCR-confirmed frames, and applies greedy NMS with a temporal gap. The selected top-K frames are passed to a downstream answerer VLM (Qwen3-VL-8B or GPT-4o).
 
 The repo also releases two long-video evaluation sets:
 
-- **Molmo-2 Moments** (M2C-v2) — long-video QA where every question is anchored to a specific time interval. Used for Tables 2 (QA) and 3 (QA + ablations).
-- **Molmo-2 Captions** — 1000 caption + clip-interval pairs used for caption-retrieval evaluation (Table 5).
+- **Molmo-2 Moments** (M2C-v2) — long-video QA where every question is anchored to a specific time interval. 
+- **Molmo-2 Captions** — 1000 caption + clip-interval pairs used for caption-retrieval evaluation.
 
 See [Datasets](#datasets) below.
 
@@ -39,10 +39,6 @@ toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
     data.start_idx=0 data.end_idx=10 \
     data.save_path=outputs/smoke_lvb
 ```
-
-Every model run needs a GPU. Slurm launchers in `scripts/slurm/` request a single A100/A40 per array task, 100 GB mem, 2 CPUs. The unit tests under `tests/` are the only thing that runs comfortably on CPU.
-
-GRPO training runs on a separate cluster (see `training/slurm/train_grpo.sbatch` — uses `ghx4` partition on Delta AI as a Hopper example; one node × 4 GPUs is the paper recipe).
 
 ## Layout
 
@@ -128,7 +124,7 @@ ToolMerge has two phases that touch different code paths:
 
 **Cache phase:** the only stage that touches raw video pixels (other than the answerer extracting the K selected frames at the end). Run once per dataset; the outputs are reused by every subsequent inference run, every baseline, every reward call during training.
 
-**Runtime:** the heavy SigLIP-2 / T-REN models only encode the planner's short text queries; the answerer VLM is the only model that ever sees image pixels at runtime, and only for the K selected frames. Everything else is a dot product against precomputed features.
+**Runtime:**  SigLIP-2 / T-REN models only encode the planner's short text queries; the answerer VLM is the only model that ever sees image pixels at runtime, and only for the K selected frames. Everything else is a dot product against precomputed features.
 
 The same `toolmerge/tools/{siglip,tren,ocr_judge}.py` clients are imported by both phases — the cache builders use their image-encoding methods, the runtime pipeline uses their text-encoding (or LLM-judge) methods. Same is true at training reward time: [`training/frame_selection_backend.py`](training/frame_selection_backend.py) loads the same caches via `caches_for_video` and runs `gather_evidence`, identical to the inference path.
 

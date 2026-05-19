@@ -16,6 +16,3 @@ ocr_judge_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr_judge/molmo2_momen
 
 max_final_k: 8
 model_backend: qwen3vl
-
-answer_generator:
-  prompt_template: v1

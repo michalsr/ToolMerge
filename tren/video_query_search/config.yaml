@@ -42,5 +42,9 @@ tren:
     num_workers: 1
 
   logging:
-    save_dir: 'outputs/tren/'
+    # The T-REN trained checkpoint (best_checkpoint.pth) and the DINOv3 + DINOTxt
+    # pretrained weights are loaded from `${save_dir}/${exp_name}/...`. Default
+    # placement is alongside this package (toolmerge/tren/); override at runtime
+    # via env var DINOV3_REPO + tren config overrides if you put weights elsewhere.
+    save_dir: 'tren/'
     exp_name: '.'

@@ -255,7 +255,7 @@ def run_pipeline(
         raise ValueError(
             f"Cannot determine num_frames (uid={uid!r}); ensure SigLIP/T-REN/OCR caches exist for this video."
         )
-    duration = f"{num_frames / fps:.0f}s"
+    duration = f"{num_frames / fps:.0f}"
 
     available_tools = check_available_tools(video_caches, cfg)
     logger.info(
