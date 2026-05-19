@@ -19,8 +19,21 @@ conda env create -f ../../env/lif.yaml
 conda activate toolmerge-lif
 ```
 
-Then apply the PyTorch source patch the upstream LIF authors describe in
-their ``install.sh`` — search for ``torch/_C/__init__.pyi`` in that script.
+LIF's mmcv pin forces ``torch==2.4.1`` (the ``install.sh`` step pulls torch 2.4.1
+alongside YOLO-World). Newer ``transformers`` versions (≥4.50) added a guard
+in ``transformers/utils/import_utils.py::check_torch_load_is_safe`` that
+refuses to call ``torch.load`` when torch is older than 2.6 (CVE-2025-32434).
+Because Qwen3-VL is loaded via that path, the guard fires before the model
+weights ever get touched. To run Qwen3-VL inside this env we make
+``check_torch_load_is_safe`` an early ``return``:
+
+```python
+# transformers/utils/import_utils.py
+def check_torch_load_is_safe() -> None:
+    return  # bypass: torch 2.4.1 pinned via mmcv; required for Qwen3-VL
+    if not is_torch_greater_or_equal("2.6"):
+        raise ValueError(...)
+```
 
 ## Run the paper's LIF baseline rows
 

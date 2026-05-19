@@ -6,14 +6,19 @@ channels:
   - defaults
 
 # Separate conda env required by the LIF baseline (`baselines/lif/`). LIF
-# pins mmcv / mmdet versions that conflict with the main `toolmerge` env, and
-# additionally requires a small patch to PyTorch's source (the original LIF
-# repo's README documents which line to edit).
+# pins mmcv / mmdet versions that conflict with the main `toolmerge` env;
+# install.sh additionally pulls torch 2.4.1 to satisfy YOLO-World + mmcv.
+# To load Qwen3-VL inside this env we patch
+# `transformers/utils/import_utils.py::check_torch_load_is_safe` to early-
+# return — newer transformers (>=4.50) refuse `torch.load` on torch<2.6
+# (CVE-2025-32434), which fires before Qwen3-VL weights ever load.
+# See `baselines/lif/README_TOOLMERGE.md` for the exact one-line patch.
 #
 # Workflow:
 #   1. Build this env (`conda env create -f env/lif.yaml`).
-#   2. Apply the PyTorch source patch as described in `baselines/lif/README.md`.
-#   3. Activate this env *only when running the LIF baseline* — `toolmerge`
+#   2. Run `baselines/lif/install.sh` to pull YOLO-World + mmcv compat fixes.
+#   3. Apply the transformers patch (see README_TOOLMERGE.md).
+#   4. Activate this env *only when running the LIF baseline* — `toolmerge`
 #      itself + every other baseline stays in the main `toolmerge` env.
 #
 # LIF is the only baseline with this constraint; the others share the main env.
