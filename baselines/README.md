@@ -6,10 +6,10 @@ then scores QA accuracy on the selected frames.
 
 | Baseline       | Algorithm                                                    | Source                                              |
 |----------------|--------------------------------------------------------------|-----------------------------------------------------|
-| `blind_text/`  | no frames (text-only LLM)                                    | in-house                                            |
-| `uniform/`     | linspace over the full video                                 | in-house                                            |
-| `oracle/`      | linspace within the GT clip (M2M only)                       | in-house                                            |
-| `siglip_q/`    | SigLIP-2 cosine → greedy NMS                                 | in-house                                            |
+| `blind_text/`  | no frames (text-only LLM)                                    | —                                                   |
+| `uniform/`     | linspace over the full video                                 | —                                                   |
+| `oracle/`      | linspace within the GT clip (M2M only)                       | —                                                   |
+| `siglip_q/`    | SigLIP-2 cosine → greedy NMS                                 | —                                                   |
 | `aks/`         | SigLIP-2 cosine → recursive split + top-k per segment        | CVPR 2025, https://github.com/ncTimTang/AKS         |
 | `bolt/`        | SigLIP-2 cosine → inverse-transform sampling on the CDF      | CVPR 2025, https://github.com/sming256/BOLT         |
 | `wfs/`         | SigLIP-2 cosine → wavelet event detection + MMR              | CVPR 2026, https://github.com/MAC-AutoML/WFS-SB     |

@@ -1,5 +1,4 @@
 # Tiny smoke run on M2C-v2 val — confirms the pipeline runs end-to-end.
-# Submit with scripts/slurm/run_table.sbatch.
 
 defaults:
   - ../default
@@ -11,7 +10,7 @@ model:
 
 data:
   input_path: ${oc.env:TOOLMERGE_DATA_DIR,data}/m2c_v2/val.json
-  save_path: ???                       # overridden by the Slurm launcher
+  save_path: ???                       # set via CLI override
   video_dir: ${oc.env:TOOLMERGE_DATA_DIR,data}/m2c_v2/videos
   video_backend: opencv
 

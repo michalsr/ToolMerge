@@ -176,29 +176,31 @@ def select_frames(
     cfg: Any,
 ) -> Tuple[List[int], List[float], Dict[str, Any]]:
     """Apply threshold + per-pool greedy NMS, then return the top-K final frames."""
-    debug: Dict[str, Any] = {}
+    selection: Dict[str, Any] = {}
+
+    selection["all_scores"] = [
+        (idx, round(s, 4)) for idx, s in sorted(combined_scores.items())
+    ]
 
     threshold = getattr(cfg, "score_threshold_value", 0.0)
     surviving = {idx: s for idx, s in combined_scores.items() if s >= threshold}
-    debug["threshold"] = threshold
-    debug["after_threshold"] = len(surviving)
+    selection["threshold"] = threshold
+    selection["after_threshold"] = len(surviving)
     if not surviving:
-        return [], [], debug
+        return [], [], selection
 
-    # Save pooled candidates at multiple K values (used by reanswer flow).
     pool_k_values = sorted(getattr(cfg, "pool_k_values", [8, 16, 32, 64]))
     min_gap_sec = getattr(cfg, "min_frame_gap_seconds", -1.0)
     gap_cap = getattr(cfg, "min_frame_gap_cap_seconds", 10.0)
     for pk in pool_k_values:
         pooled = select_pool(surviving, pk, fps, num_frames, min_gap_sec, gap_cap)
         ranked = sorted(pooled.items(), key=lambda x: x[1], reverse=True)
-        debug[f"pooled_candidates_{pk}"] = [(idx, round(s, 4)) for idx, s in ranked]
+        selection[f"pooled_candidates_{pk}"] = [(idx, round(s, 4)) for idx, s in ranked]
 
-    # Final selection: read from the pool matching cfg.max_final_k when available.
     final_k = cfg.max_final_k
     final_key = f"pooled_candidates_{final_k}"
-    if final_key in debug:
-        selected = {idx: s for idx, s in debug[final_key]}
+    if final_key in selection:
+        selected = {idx: s for idx, s in selection[final_key]}
     else:
         if min_gap_sec < 0:
             gap_sec = auto_tau_seconds(num_frames, fps, final_k, gap_cap)
@@ -213,10 +215,10 @@ def select_frames(
 
     indices = ordered_by_time(selected)
     timestamps = [idx / fps for idx in indices]
-    debug["selected_frames"] = indices
-    debug["selected_timestamps"] = timestamps
-    debug["selected_scores"] = [round(selected[idx], 4) for idx in indices]
-    return indices, timestamps, debug
+    selection["selected_frames"] = indices
+    selection["selected_timestamps"] = timestamps
+    selection["selected_scores"] = [round(selected[idx], 4) for idx in indices]
+    return indices, timestamps, selection
 
 
 def run_pipeline(
@@ -339,6 +341,18 @@ def run_pipeline(
                       "per_query": per_query_debug, "selection": sel_debug},
             "frames_used": [],
             "timestamps_used": [],
+        }
+
+    # Retrieval-only mode: no answer choices => skip pixel extraction + answerer.
+    if not options:
+        return {
+            "answer": None,
+            "confidence": 0.0,
+            "status": "retrieval_only",
+            "trace": {"planner": planner_debug, "ocr": ocr_debug,
+                      "per_query": per_query_debug, "selection": sel_debug},
+            "frames_used": indices,
+            "timestamps_used": timestamps,
         }
 
     # 5. Get the actual pixel frames for the answerer.

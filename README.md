@@ -30,15 +30,13 @@ pip install -e .
 ./scripts/download_caches.sh
 ./scripts/download_tren_weights.sh
 
-# 2. Run one paper-row config on Slurm (Delta example; adapt for your cluster)
-mkdir -p scripts/slurm/logs
-sbatch scripts/slurm/lvb_qwen3_8f.sbatch
-
-# 3. ... or run locally on a single GPU (single-process; small slices only)
+# 2. Run one paper-row config on a single GPU
 toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
     data.start_idx=0 data.end_idx=10 \
     data.save_path=outputs/smoke_lvb
 ```
+
+For larger runs, pass a `data.start_idx` / `data.end_idx` window per process and shard across GPUs yourself; nothing in the pipeline assumes a job scheduler.
 
 ## Layout
 
@@ -64,8 +62,7 @@ training/                 # GRPO post-training (TRL)
 configs/
   default.yaml            # parent config inherited by every per-table YAML
   tables/                 # per-row YAMLs (see "Configs" below)
-scripts/
-  slurm/                  # Slurm launchers (cluster-specific; adapt paths)
+scripts/                  # standalone helper scripts (caption retrieval eval, etc.)
 tests/                    # 25 unit tests
 ```
 
@@ -155,7 +152,7 @@ python -m cache_build.build_caches \
     --video_backend cv2
 ```
 
-Each video takes ~2 min on an A100. LVB val (1337 videos, ~7 min avg) ≈ 12 GPU-hours. Slurm template at `cache_build/slurm/build_cache.sbatch`; per-tool commands and chunking flags in `cache_build/README.md`.
+Each video takes ~2 min on an A100. LVB val (1337 videos, ~7 min avg) ≈ 12 GPU-hours. Per-tool commands and chunking flags are in `cache_build/README.md`.
 
 ### OCR judge cache (per-question)
 
@@ -171,7 +168,7 @@ The released checkpoint is a GRPO-finetuned planner from `Qwen3-VL-8B-Instruct`.
 - `training/configs/deepspeed_zero2.json` — ZeRO-2 config
 - `training/data/train_correct_uniform_8f_clip_max1.json` — the filtered training subset (~50% of M2M train, items the answerer gets wrong on uniform 8f)
 
-To launch (adapt the Slurm wrapper to your cluster — the bundled `training/slurm/train_grpo.sbatch` example is Delta-specific and not committed):
+To launch:
 
 ```bash
 torchrun --nnodes=1 --nproc_per_node=4 -m training.train \

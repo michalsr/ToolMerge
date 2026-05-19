@@ -32,9 +32,7 @@ python -m cache_build.build_ocr_cache    --videos <dir> --out ...
 ```
 
 Each script supports a ``--video-ids <ids.txt>`` filter so you can rebuild a
-single video or restart a partial run. SLURM templates are in
-``cache_build/slurm/``; mirror your cluster's partition / mem / GPU
-constraints there.
+single video or restart a partial run.
 
 ## Compute budget (per the paper)
 
