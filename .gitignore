@@ -74,6 +74,7 @@ scripts/slurm/lvb_bolt_*.sbatch
 scripts/slurm/baselines_*.sbatch
 scripts/slurm/test_*.sbatch
 scripts/slurm/caption_retrieval_*.sbatch
+scripts/slurm/audit_*.sbatch
 training/slurm/train_grpo.sbatch
 
 # Internal analysis / determinism debug scripts (Delta-path hardcoded)

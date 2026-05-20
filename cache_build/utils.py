@@ -132,10 +132,13 @@ def get_frame_indices(video_path: str, target_fps: float = TARGET_FPS,
     nframes = floor_by_factor(nframes, FRAME_FACTOR)
     nframes = max(int(nframes), FRAME_FACTOR)
 
-    frame_idx = (
-        torch.linspace(0, total_frames - 1, nframes)
-        .round().long().clamp(0, total_frames - 1).tolist()
-    )
+    # Tick formula: cache index k corresponds to time k/target_fps. Matches
+    # toolmerge/run.py:extract_cv2 so the answerer decodes the exact native
+    # frame the cache encoded.
+    frame_idx = [
+        min(int(k / target_fps * video_fps), total_frames - 1)
+        for k in range(int(nframes))
+    ]
     return frame_idx, nframes, reader
 
 

@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any, Dict
 
 import cv2
-import torch
 
 from toolmerge.config import ToolMergeConfig, get_config_path_from_cli, load_config, save_config
 from toolmerge.inputs import item_uid, load_dataset
@@ -42,7 +41,10 @@ def find_video(video_dir: str, video_id: str) -> str:
     raise FileNotFoundError(f"No video for {video_id!r} under {video_dir}")
 
 
-def video_nframes_at_fps(video_path: str, target_fps: float) -> int:
+def video_nframes_at_fps(video_path: str, target_fps: float, frame_factor: int = 2) -> int:
+    """Mirrors cache_build/utils.py:get_frame_indices nframes math: floor to a
+    multiple of FRAME_FACTOR=2 (Qwen convention) so the uniform grid lines up
+    with the SigLIP/T-REN/OCR cache grids if they ever get built."""
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise RuntimeError(f"Cannot open video: {video_path}")
@@ -51,7 +53,10 @@ def video_nframes_at_fps(video_path: str, target_fps: float) -> int:
     cap.release()
     if native_fps <= 0 or n_total <= 0:
         raise RuntimeError(f"Bad video metadata for {video_path}: fps={native_fps} total={n_total}")
-    return max(1, int(round(n_total / native_fps * target_fps)))
+    nframes = n_total / native_fps * target_fps
+    nframes = min(nframes, n_total)
+    nframes = (int(nframes) // frame_factor) * frame_factor
+    return max(int(nframes), frame_factor)
 
 
 def run_one(item: dict, cfg: ToolMergeConfig, target_fps: float) -> Dict[str, Any]:
@@ -61,7 +66,10 @@ def run_one(item: dict, cfg: ToolMergeConfig, target_fps: float) -> Dict[str, An
     n = video_nframes_at_fps(video_path, target_fps)
 
     k = cfg.max_final_k
-    indices = torch.linspace(0, n - 1, min(k, n)).round().long().tolist()
+    if k >= n:
+        indices = list(range(n))
+    else:
+        indices = [int(i * n / k) for i in range(k)]
     timestamps = [i / target_fps for i in indices]
 
     return {
