@@ -100,7 +100,7 @@ def setup_main_backend(cfg: ToolMergeConfig):
     if cfg.model_backend == "qwen3vl":
         model, processor = load_qwen3_vl(cfg)
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        return Qwen3VLBackend(model, processor, device=device, qwen_version=cfg.qwen_version)
+        return Qwen3VLBackend(model, processor, device=device)
     raise ValueError(f"Unknown model_backend: {cfg.model_backend!r}. Use 'qwen3vl' or 'openai'.")
 
 
@@ -148,25 +148,6 @@ def setup_planner_backend(cfg: ToolMergeConfig, main_backend):
             max_retries=cfg.planner_openai.max_retries,
         )
     raise ValueError(f"Unknown planner_backend: {cfg.planner_backend!r}")
-
-
-def setup_ocr_backend(cfg: ToolMergeConfig, main_backend):
-    """OCR judge backend selector.
-
-    ``cfg.ocr_llm_model``:
-        ""                       -> reuse main backend (text-only call)
-        "openai:<model>"         -> OpenAIBackend (auto-detects Azure)
-        any other string         -> reuse main backend
-    """
-    if not getattr(cfg, "ocr_cache_dir", "") or not os.path.isdir(cfg.ocr_cache_dir):
-        return None
-    model = (cfg.ocr_llm_model or "").strip()
-    if not model:
-        return main_backend
-    if model.startswith("openai:"):
-        model_name = model.split(":", 1)[1]
-        return OpenAIBackend(model_name=model_name, max_retries=5)
-    return main_backend
 
 
 def setup_tool_clients(cfg: ToolMergeConfig):
@@ -303,11 +284,10 @@ def run(cfg: ToolMergeConfig) -> Dict[str, Any]:
     backend = setup_main_backend(cfg)
     if not reanswer_mode:
         siglip_client, tren_client = setup_tool_clients(cfg)
-        ocr_backend = setup_ocr_backend(cfg, backend)
         planner_backend = setup_planner_backend(cfg, backend)
     else:
         siglip_client = tren_client = None
-        ocr_backend = planner_backend = None
+        planner_backend = None
 
     items = load_dataset(cfg.data.input_path, cfg.data.start_idx, cfg.data.end_idx)
     logger.info("Loaded %d items from %s", len(items), cfg.data.input_path)
@@ -359,7 +339,6 @@ def run(cfg: ToolMergeConfig) -> Dict[str, Any]:
                     video_caches=video_caches,
                     backend=backend,
                     cfg=cfg,
-                    ocr_backend=ocr_backend,
                     planner_backend=planner_backend,
                     uid=uid,
                     extract_frames=extract,

@@ -78,7 +78,7 @@ def build_frame_messages(frames, timestamps, prompt_text, include_timestamps: bo
 def generate_qwen_pil(
     backend, pil_frames, timestamps, prompt_text, cfg, include_timestamps: bool,
 ):
-    """Byte-parity Qwen3-VL path: PIL images directly, no qwen_version override."""
+    """Byte-parity Qwen3-VL path: PIL images directly."""
     import torch
     from toolmerge.qwen_vl_utils import process_vision_info
 

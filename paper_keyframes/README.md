@@ -1,6 +1,6 @@
 # Paper-row keyframes
 
-This directory ships the per-question keyframe selections used for the paper's
+This directory contains the per-question keyframe selections used for the paper's
 LVB / Video-MME / Molmo-2 Moments rows. Each `<row>/keyframes.json` is the
 canonical "what frames did our pipeline pick" output for one paper cell, with
 the full debug trace stripped — just the fields the toolmerge answerer needs

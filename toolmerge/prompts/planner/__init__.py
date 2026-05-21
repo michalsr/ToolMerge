@@ -1,6 +1,6 @@
 """Planner prompts.
 
-Only one prompt is shipped: ``v7_no_temporal``. This is the prompt printed in
+Only one prompt is included: ``v7_no_temporal``. This is the prompt printed in
 the paper's Appendix F and used for **all** inference (including caption
 retrieval). The other v* / planner_* variants from the research tree are not
 included.

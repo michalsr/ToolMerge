@@ -20,11 +20,10 @@ logger = logging.getLogger(__name__)
 class Qwen3VLBackend(ModelBackend):
     """Wraps a HuggingFace Qwen3-VL model + processor."""
 
-    def __init__(self, model, processor, device: str = "cuda", qwen_version: str = "qwen3"):
+    def __init__(self, model, processor, device: str = "cuda"):
         self.model = model
         self.processor = processor
         self.device = device
-        self.qwen_version = qwen_version
 
     def gen_kwargs(self, cfg: Any) -> Dict[str, Any]:
         do_sample = bool(getattr(cfg, "do_sample", False))
@@ -58,7 +57,7 @@ class Qwen3VLBackend(ModelBackend):
             messages, tokenize=False, add_generation_prompt=True,
         )
         image_inputs, video_inputs, video_kwargs = process_vision_info(
-            messages, return_video_kwargs=True, qwen_version=self.qwen_version,
+            messages, return_video_kwargs=True,
         )
         inputs = self.processor(
             text=[text],

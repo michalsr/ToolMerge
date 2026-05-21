@@ -1,19 +1,15 @@
 """Build EasyOCR per-video caches (text per frame, no bbox).
 
 Output: ``{"ocr_results": [[{"text": str}, ...], ...], "fps", "num_frames", "video_id"}``
-at ``{video_id}.ocr_cache``. The inference-time OCR judge (``toolmerge/tools/ocr_judge.py``)
-reads this cache and runs an LLM over the per-frame text strings.
-
-`embed_ocr_caches` is an optional post-pass that embeds the unique OCR strings
-with EmbeddingGemma so downstream baselines (e.g., SigLIP-Q) can rank by
-OCR-string similarity. Writes ``{video_id}.ocr_embed_cache``.
+at ``{video_id}.ocr_cache``. The inference-time OCR judge
+(``toolmerge/tools/ocr_judge.py``) reads this cache and runs an LLM over the
+per-frame text strings.
 """
 
 from __future__ import annotations
 
 import gc
 import os
-from pathlib import Path
 
 import numpy as np
 import torch
@@ -99,66 +95,3 @@ def build_ocr(video_path, video_id, output_dir, reader,
     del vr
     gc.collect()
     return n_det, nframes
-
-
-def embed_ocr_caches(ocr_output_dir, embed_dim=768):
-    """Post-pass: embed unique OCR strings per video with EmbeddingGemma."""
-    from sentence_transformers import SentenceTransformer
-    MODEL_ID = "google/embeddinggemma-300m"
-
-    cache_files = sorted(Path(ocr_output_dir).glob("*.ocr_cache"))
-    if not cache_files:
-        print("No OCR caches to embed")
-        return
-
-    print(f"Embedding {len(cache_files)} OCR caches with {MODEL_ID}...")
-    model = SentenceTransformer(MODEL_ID, model_kwargs={"torch_dtype": torch.bfloat16})
-
-    for cache_path in cache_files:
-        video_id = cache_path.stem
-        embed_path = cache_path.parent / f"{video_id}.ocr_embed_cache"
-        if embed_path.exists():
-            continue
-
-        ocr_data = torch.load(str(cache_path), map_location="cpu", weights_only=False)
-        ocr_results = ocr_data["ocr_results"]
-
-        string_to_idx = {}
-        strings = []
-        frame_string_indices = []
-        for frame_dets in ocr_results:
-            frame_indices = []
-            for det in frame_dets:
-                text = det["text"].strip()
-                if not text:
-                    continue
-                if text not in string_to_idx:
-                    string_to_idx[text] = len(strings)
-                    strings.append(text)
-                frame_indices.append(string_to_idx[text])
-            frame_string_indices.append(frame_indices)
-
-        if not strings:
-            embeddings = torch.zeros(0, embed_dim, dtype=torch.bfloat16)
-        else:
-            embeddings = model.encode_document(
-                strings, batch_size=512, show_progress_bar=False,
-                convert_to_tensor=True,
-                truncate_dim=embed_dim if embed_dim < 768 else None,
-            )
-            embeddings = torch.nn.functional.normalize(embeddings.float(), p=2, dim=1)
-            embeddings = embeddings.to(torch.bfloat16).cpu()
-
-        result = {
-            "strings": strings,
-            "embeddings": embeddings,
-            "string_to_idx": string_to_idx,
-            "frame_string_indices": frame_string_indices,
-            "model_id": MODEL_ID,
-            "embed_dim": embed_dim,
-            "video_id": video_id,
-        }
-        torch.save(result, str(embed_path))
-        print(f"  {video_id}: {len(strings)} strings -> {list(embeddings.shape)}")
-
-    print("OCR embedding done")

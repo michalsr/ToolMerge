@@ -46,7 +46,7 @@ def build_backend(cfg: ToolMergeConfig):
     import torch as _torch
     model, processor = load_qwen3_vl(cfg)
     device = "cuda" if _torch.cuda.is_available() else "cpu"
-    return Qwen3VLBackend(model, processor, device=device, qwen_version=cfg.qwen_version)
+    return Qwen3VLBackend(model, processor, device=device)
 
 
 def main():

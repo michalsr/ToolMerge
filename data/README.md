@@ -58,7 +58,7 @@ ${TOOLMERGE_DATA_DIR}/
       --local-dir $TOOLMERGE_DATA_DIR/m2m
   ```
 
-  The HF dataset ships the JSONs **and** the 1356 source `.mp4` files under
+  The HF dataset includes the JSONs **and** the 1356 source `.mp4` files under
   `videos/`. License: CC-BY-NC-SA-4.0.
 
 - **Long Video Bench** — see

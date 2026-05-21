@@ -1,12 +1,12 @@
-# LIF — Logic-in-Frames (vendored)
+# LIF — Logic-in-Frames (in-tree copy)
 
-This directory is a near-verbatim vendoring of
+This directory is a near-verbatim in-tree copy of
 [Logic-in-Frames](https://github.com/...). One subtree was intentionally
 excluded — ``LLaVA-NeXT/`` (the upstream repo's LLaVA-NeXT clone) — because
 the paper run does **not** use LLaVA-NeXT.
 
-The pretrained YOLO-World weights ``pretrained/YOLO-World/*.pth`` were also
-not vendored (too large for git). Download them per the upstream README:
+The pretrained YOLO-World weights ``pretrained/YOLO-World/*.pth`` are also
+not included (too large for git). Download them per the upstream README:
 ``yolo_world_v2_xl_obj365v1_goldg_cc3mlite_pretrain-5daf1395.pth``.
 
 ## Special conda environment required
@@ -47,6 +47,23 @@ python scripts/get_VSLS_key_frames.py --obj_path obj.json --kfs_path kfs.json
 # (LIF's stage 3 also runs QA itself; for the table parity, skip it and use
 # our shared answerer instead — see baselines/README.md)
 ```
+
+## Video paths in `Datasets/group1_0412_test_split.json`
+
+The included split uses the placeholder ``${TOOLMERGE_DATA_DIR}/m2m/videos/<video_id>.mp4``
+for every ``video_path`` field. LIF's loader reads ``video_path`` as a literal
+string and passes it straight to ``cv2.VideoCapture``, so the placeholder must
+be substituted before running. Either:
+
+```bash
+# One-shot in place, pointing at wherever your m2m videos live:
+sed -i 's|\${TOOLMERGE_DATA_DIR}/m2m/videos|/abs/path/to/m2m/videos|g' \
+    Datasets/group1_0412_test_split.json
+```
+
+or pipe through ``envsubst`` at load time after exporting
+``TOOLMERGE_DATA_DIR``. The schema otherwise matches the M2M split
+(see top-level ``README.md`` Datasets section).
 
 The original LIF ``README.md`` is in this directory; the ``install.sh``,
 ``environment.yml``, and run-* scripts work as in the upstream repo.

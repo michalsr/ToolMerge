@@ -1,15 +1,16 @@
 """LLM-judged OCR relevance.
 
-Instead of doing OCR retrieval against the query, we send every extracted
-text snippet to a small LLM judge and ask whether it helps answer the
-question. Frames whose text gets a YES verdict are inserted into the merged
-ranking at rank 1.
+Per-question YES/NO decisions over the OCR strings extracted by
+``cache_build/ocr.py``. Results live in ``{cache_dir}/{uid}.json``;
+``load_judge_cache`` reads them at inference time.
 
-Per-question results are cached to disk (depend only on (video, question,
-options) — independent of the planner / answerer / tool selection).
+This module is invoked **from the cache builder**
+(``cache_build.build_caches --tools ocr_judge``) — the runtime pipeline
+only reads the cache. ``judge_ocr_relevance_batched`` runs the LLM during
+the build and writes the per-question JSON.
 
-The actual per-frame OCR text extraction is done upstream during cache
-build by ``cache_build/ocr.py`` (EasyOCR).
+Frame extraction (EasyOCR over raw video) is upstream in
+``cache_build/ocr.py``.
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from toolmerge.prompts.ocr_judge import OCR_JUDGE_PROMPT, OCR_JUDGE_BATCH_PROMPT
+from toolmerge.prompts.ocr_judge import OCR_JUDGE_BATCH_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -199,63 +200,6 @@ def parse_batch_response(response: str, n_texts: int) -> List[bool]:
 
 
 # --- Public API ----------------------------------------------------------
-
-def judge_ocr_relevance(
-    question: str,
-    options: dict,
-    ocr_cache: dict,
-    start_idx: int,
-    end_idx: int,
-    backend: Any,
-    cfg: Any,
-    uid: str = "",
-    cache_dir: str = "",
-) -> List[int]:
-    """One YES/NO LLM call per unique segment. Returns relevant frame indices."""
-    current_fps = float(ocr_cache.get("fps", 2.0)) if isinstance(ocr_cache, dict) else None
-    cached = load_judge_cache(cache_dir, uid, current_fps=current_fps)
-    if cached is not None:
-        logger.info("OCR judge: cache hit for %s (%d frames)", uid, len(cached))
-        return cached
-
-    segments, text_to_seg_ids, text_to_raw, fps = prepare_segments(ocr_cache, start_idx, end_idx)
-    if not segments:
-        logger.info("No OCR text found in video")
-        save_judge_cache(cache_dir, uid, [], fps=current_fps)
-        return []
-
-    logger.info("OCR judge: %d segments, %d unique texts", len(segments), len(text_to_seg_ids))
-
-    judge_cfg = OcrJudgeCfg(max_new_tokens=getattr(cfg, "ocr_llm_max_tokens", 16))
-    options_text = format_options(options)
-    relevant_segment_ids = set()
-
-    t0 = time.time()
-    for key, seg_ids in text_to_seg_ids.items():
-        text = text_to_raw[key]
-        prompt = OCR_JUDGE_PROMPT.format(question=question, options=options_text, ocr_text=text)
-        messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
-        try:
-            response = backend.generate_text(messages, judge_cfg).strip().upper()
-        except Exception as e:  # noqa: BLE001
-            logger.warning("OCR judge call failed (skipping): %r", e)
-            continue
-        if response.startswith("YES"):
-            relevant_segment_ids.update(seg_ids)
-
-    logger.info(
-        "OCR judge: %d unique texts judged in %.1fs",
-        len(text_to_seg_ids), time.time() - t0,
-    )
-
-    relevant_frames = segments_to_frames(segments, relevant_segment_ids)
-    logger.info(
-        "OCR judge: %d/%d segments relevant, %d frames",
-        len(relevant_segment_ids), len(segments), len(relevant_frames),
-    )
-    save_judge_cache(cache_dir, uid, relevant_frames, fps=current_fps)
-    return relevant_frames
-
 
 def judge_ocr_relevance_batched(
     question: str,

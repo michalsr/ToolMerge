@@ -14,7 +14,6 @@ model:
 # OPENAI_BASE_URL). The same backend is used for the planner unless `planner_backend`
 # is set below (rarely needed).
 model_backend: qwen3vl
-qwen_version: qwen3                    # `qwen3` (paper) or `qwen2_5` for older checkpoints
 
 # === Dataset + raw videos ======================================================
 data:
@@ -42,20 +41,18 @@ siglip_feature_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/siglip
 tren_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/tren
 ocr_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr
 
-# === OCR judge — LLM filter over per-frame OCR text ============================
-# An LLM judges which frames' OCR contains text relevant to the question. Hits are
-# injected into the merged score list with weight 1.0. Disable by clearing ocr_cache_dir.
-ocr_llm_model: openai:gpt-4o-mini      # `openai:<model>` routes via OpenAIBackend
-ocr_llm_max_tokens: 256
-ocr_batch_size: 20                     # frames per LLM call (>1 batches the judge prompt)
+# === OCR judge ================================================================
+# Per-question relevance decisions are read from `ocr_judge_cache_dir` (pre-built
+# via `python -m cache_build.build_caches --tools ocr_judge ...`). The pipeline
+# never invokes an LLM for OCR at inference; a cache miss skips OCR for that
+# question. Disable entirely by clearing `ocr_cache_dir`.
 ocr_pool_seconds: -1                   # -1 = auto (matches min_frame_gap_cap_seconds);
                                        # >0 = collapse adjacent OCR hits within N seconds
 ocr_judge_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr_judge
 
-# === Selection (threshold + greedy NMS) =======================================
-# After AND/OR merging, drop frames below `score_threshold_value`, then pick top-K with
-# a temporal gap. Paper default: threshold 0 (keep everything), auto-τ = min(D/(2K), 10)s.
-score_threshold_value: 0.0
+# === Selection (greedy NMS) ===================================================
+# After AND/OR merging, pick top-K with a temporal gap. Paper default:
+# auto-τ = min(D/(2K), 10)s.
 max_final_k: 8                         # override to 32 for the K=32 paper rows
 pool_k_values: [8, 16, 32, 64]         # also save top-K candidates at these K's in the trace;
                                        # used by reanswer mode (data.source_dir)

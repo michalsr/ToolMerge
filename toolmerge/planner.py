@@ -2,8 +2,8 @@
 
 Reads the question + answer choices + available tools + video duration and
 emits independent SigLIP / T-REN tool calls combined under AND/OR. The
-planner is text-only (no input frames). Ships one prompt template
-(``v7_no_temporal``).
+planner is text-only (no input frames). Only one prompt template
+(``v7_no_temporal``) is included.
 """
 
 from __future__ import annotations

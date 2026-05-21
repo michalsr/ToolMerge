@@ -47,9 +47,9 @@ cache = client.encode_video(frames)                       # one-time, cache to d
 scores = client.get_frame_scores(cache, "red car")        # per-query
 ```
 
-## Why ship a copy?
+## Why include a copy?
 
-T-REN is a research codebase (no PyPI release as of this paper). Shipping a
-copy keeps `toolmerge` self-contained. If an upstream package is released,
-`toolmerge.tools.tren.TrenClient` can be retargeted at it without changes
-elsewhere in the repo.
+T-REN is a research codebase (no PyPI release as of this paper). Keeping a
+copy in-tree makes `toolmerge` self-contained. If an upstream package is
+released, `toolmerge.tools.tren.TrenClient` can be retargeted at it without
+changes elsewhere in the repo.

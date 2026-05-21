@@ -25,7 +25,7 @@ from toolmerge.merging import (
 )
 from toolmerge.planner import plan_evidence
 from toolmerge.selection import greedy_gap_select, ordered_by_time, select_pool, auto_tau_seconds
-from toolmerge.tools.ocr_judge import judge_ocr_relevance, judge_ocr_relevance_batched
+from toolmerge.tools.ocr_judge import load_judge_cache
 from toolmerge.tools.scoring import score_siglip, score_tren
 from toolmerge.answerer import generate_answer
 
@@ -182,18 +182,14 @@ def select_frames(
         (idx, round(s, 4)) for idx, s in sorted(combined_scores.items())
     ]
 
-    threshold = getattr(cfg, "score_threshold_value", 0.0)
-    surviving = {idx: s for idx, s in combined_scores.items() if s >= threshold}
-    selection["threshold"] = threshold
-    selection["after_threshold"] = len(surviving)
-    if not surviving:
+    if not combined_scores:
         return [], [], selection
 
     pool_k_values = sorted(getattr(cfg, "pool_k_values", [8, 16, 32, 64]))
     min_gap_sec = getattr(cfg, "min_frame_gap_seconds", -1.0)
     gap_cap = getattr(cfg, "min_frame_gap_cap_seconds", 10.0)
     for pk in pool_k_values:
-        pooled = select_pool(surviving, pk, fps, num_frames, min_gap_sec, gap_cap)
+        pooled = select_pool(combined_scores, pk, fps, num_frames, min_gap_sec, gap_cap)
         ranked = sorted(pooled.items(), key=lambda x: x[1], reverse=True)
         selection[f"pooled_candidates_{pk}"] = [(idx, round(s, 4)) for idx, s in ranked]
 
@@ -227,7 +223,6 @@ def run_pipeline(
     video_caches: dict,
     backend: Any,
     cfg: Any,
-    ocr_backend: Optional[Any] = None,
     planner_backend: Optional[Any] = None,
     uid: str = "",
     extract_frames=None,
@@ -239,7 +234,6 @@ def run_pipeline(
         video_caches: ``toolmerge.caches.caches_for_video`` output.
         backend: answerer backend.
         cfg: ToolMergeConfig.
-        ocr_backend: backend for the OCR judge LLM. ``None`` = use ``backend``.
         planner_backend: backend for the planner. ``None`` = use ``backend``.
         uid: question UID for OCR-judge cache lookup.
         extract_frames: callable ``(video_path, indices, fps) -> tensor`` used
@@ -247,6 +241,11 @@ def run_pipeline(
 
     Returns: ``{answer, confidence, status, trace, frames_used, timestamps_used,
               answer_prompt, answer_raw}``.
+
+    OCR-judge frames are read from the pre-built cache pointed to by
+    ``cfg.ocr_judge_cache_dir``; the pipeline never invokes an LLM for OCR
+    judging at inference time. Build the cache with
+    ``python -m cache_build.build_caches --tools ocr_judge ...``.
     """
     fps = video_caches["fps"]
     frames_all = video_caches.get("frames")
@@ -288,21 +287,20 @@ def run_pipeline(
             "timestamps_used": [],
         }
 
-    # 2. OCR judge (if cache present).
+    # 2. OCR judge — read pre-built cache only (no LLM call at inference).
     ocr_frames: List[int] = []
     ocr_debug: Dict[str, Any] = {}
     ocr_cache = video_caches.get("ocr_cache")
-    if ocr_cache is not None:
-        ocr_be = ocr_backend or backend
-        ocr_batch_size = getattr(cfg, "ocr_batch_size", 1)
-        judge_fn = judge_ocr_relevance_batched if ocr_batch_size > 1 else judge_ocr_relevance
-        ocr_frames = judge_fn(
-            question, options, ocr_cache, 0, num_frames, ocr_be, cfg,
-            **({"batch_size": ocr_batch_size} if ocr_batch_size > 1 else {}),
-            uid=uid, cache_dir=getattr(cfg, "ocr_judge_cache_dir", ""),
-        )
-        ocr_debug = {"ocr_frames": ocr_frames, "num_ocr_frames": len(ocr_frames)}
-        logger.info("  OCR judge: %d relevant frames", len(ocr_frames))
+    ocr_judge_cache_dir = getattr(cfg, "ocr_judge_cache_dir", "")
+    if ocr_cache is not None and ocr_judge_cache_dir and uid:
+        current_fps = float(ocr_cache.get("fps", fps)) if isinstance(ocr_cache, dict) else fps
+        cached = load_judge_cache(ocr_judge_cache_dir, uid, current_fps=current_fps)
+        if cached is None:
+            logger.info("  OCR judge: no cache for %s (skipping)", uid)
+        else:
+            ocr_frames = cached
+            ocr_debug = {"ocr_frames": ocr_frames, "num_ocr_frames": len(ocr_frames)}
+            logger.info("  OCR judge: %d relevant frames (cache hit)", len(ocr_frames))
 
     # 3. Score each query through its tool.
     per_query_scores, per_query_debug = score_queries(queries, video_caches, num_frames)

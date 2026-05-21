@@ -240,7 +240,7 @@ toolmerge config=configs/lvb/qwen3_32.yaml \
 
 ### Paper-row keyframes
 
-[`paper_keyframes/`](paper_keyframes/) ships one `keyframes.json` per paper row (LVB/Video-MME/M2M × Qwen3/GPT-4o × 8/32). Point `data.source_dir` at any of those directories to reproduce the paper accuracy in answerer-only mode (no GPU planner / tools needed):
+[`paper_keyframes/`](paper_keyframes/) contains one `keyframes.json` per paper row (LVB/Video-MME/M2M × Qwen3/GPT-4o × 8/32). Point `data.source_dir` at any of those directories to reproduce the paper accuracy in answerer-only mode (no GPU planner / tools needed):
 
 ```bash
 toolmerge config=configs/lvb/qwen3_32.yaml \
@@ -280,7 +280,7 @@ Per-baseline invocation details and the shared `keyframes.json` schema are in `b
 
 ## Datasets
 
-Two evaluation sets ship with this repo, both anchored to per-question time intervals.
+Two evaluation sets are included in this repo, both anchored to per-question time intervals.
 
 ### Molmo-2 Moments (`m2m`)
 

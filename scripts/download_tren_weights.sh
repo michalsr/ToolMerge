@@ -3,7 +3,7 @@
 #
 # Pulls the T-REN region-encoder checkpoint from the canonical Hugging Face
 # Hub release (https://huggingface.co/savyak2/T-REN) into the location the
-# vendored tren/ package looks for it.
+# in-tree tren/ package looks for it.
 #
 # The DINOv3 backbone weights are NOT released by the T-REN repo — see
 # tren/README.md for how to obtain them from Facebook Research's dinov3 repo.

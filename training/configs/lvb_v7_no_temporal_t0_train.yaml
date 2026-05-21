@@ -19,7 +19,6 @@ data:
   end_idx: null
 
 model_backend: qwen3vl
-qwen_version: qwen3
 
 # Planner — ignored during training (rollout provides the plan).
 planner_prompt: v7_no_temporal
@@ -37,9 +36,6 @@ tren_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/tren/m2m
 ocr_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr/m2m
 ocr_judge_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr_judge/m2m
 
-# Thresholding — disabled (top-k only).
-score_threshold_mode: percentile
-score_threshold_value: 0.0
 min_frames_per_query: 16
 max_final_k: 8
 min_frame_gap_seconds: -1  # auto: duration/(max_final_k*2), cap 10s
@@ -51,10 +47,7 @@ segment_mode: threshold_only
 peak_drop_pct: 0.10
 segment_merge_gap: 5
 
-# OCR LLM-judged. Reads OPENAI_API_KEY / OPENAI_BASE_URL from env at runtime.
-ocr_llm_model: openai:gpt-4o-mini
-ocr_llm_max_tokens: 256
-ocr_batch_size: 20
+# OCR judge — read pre-built cache (cache_build.build_caches --tools ocr_judge).
 ocr_pool_seconds: -1
 
 # Answer generator — lif prompt (matches downstream eval), temperature 0.

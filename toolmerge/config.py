@@ -83,7 +83,6 @@ class ToolMergeConfig:
     # Models / backends
     model: ModelConfig = field(default_factory=ModelConfig)
     model_backend: str = "qwen3vl"       # "qwen3vl" | "openai"
-    qwen_version: str = "qwen3"
     openai: OpenAIBackendConfig = field(default_factory=OpenAIBackendConfig)
 
     # Separate planner backend (empty = use model_backend for everything)
@@ -108,9 +107,7 @@ class ToolMergeConfig:
     tren_cache_dir: str = ""
     ocr_cache_dir: str = ""
 
-    # Thresholding / pooling (defaults from default.yaml)
-    score_threshold_mode: str = "percentile"
-    score_threshold_value: float = 0.0   # 0 keeps everything; ablation uses higher
+    # Pooling
     min_frames_per_query: int = 16
     max_final_k: int = 8                 # paper uses K=8 or K=32 via override
     pool_k_values: List[int] = field(default_factory=lambda: [8, 16, 32, 64])
@@ -119,10 +116,7 @@ class ToolMergeConfig:
     min_frame_gap_seconds: float = -1.0
     min_frame_gap_cap_seconds: float = 10.0
 
-    # OCR judge
-    ocr_llm_model: str = "openai:gpt-4o-mini"   # routed through OpenAIBackend
-    ocr_llm_max_tokens: int = 256
-    ocr_batch_size: int = 20
+    # OCR judge (read from a pre-built cache; build via cache_build.build_caches --tools ocr_judge)
     ocr_pool_seconds: float = -1.0       # auto: match min_frame_gap formula
     ocr_judge_cache_dir: str = ""
 

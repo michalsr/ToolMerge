@@ -1,6 +1,6 @@
 """Answerer prompts.
 
-Two templates are shipped:
+Two templates are included:
 - ``lif`` — default; used by every paper row EXCEPT Qwen3-VL 8f rows.
 - ``v1``  — used by Qwen3-VL 8f rows only (Table 2 LVB Qwen3 8f, Table 3 M2M QA Qwen3 8f).
 """
