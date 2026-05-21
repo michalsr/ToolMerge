@@ -300,45 +300,82 @@ Per-baseline invocation details and the shared `keyframes.json` schema are in `b
 
 ## Datasets
 
-Two evaluation sets are included in this repo, both anchored to per-question time intervals.
-
-### Molmo-2 Moments (`m2m`)
-
-Long-video QA — every question has a `[start, end]` ground-truth clip. Used for the M2M paper rows and the GRPO training signal.
-
-```
-${TOOLMERGE_DATA_DIR}/m2m/
-  test.json                  # QA + clip intervals
-  val.json                   # human-verified val split
-  captions_1k.json           # 1000 caption + clip-interval pairs (caption retrieval)
-  videos/                    # source mp4 files
-```
+ToolMerge reads dataset JSON files directly from disk — no Hugging Face Datasets
+dependency. Point ``data.input_path`` in your config at a local file.
 
 Item schema:
 
 ```json
 {
-  "uid": "<video_id>_<q_idx>",
+  "uid": "abc123_0",
   "video_id": "abc123",
-  "question": "...",
-  "options": {"A": "...", "B": "...", "C": "...", "D": "..."},
+  "question": "What does the woman in the red dress do after picking up the book?",
+  "options": {"A": "...", "B": "...", "C": "...", "D": "...", "E": "..."},
   "answer": "C",
-  "start": 12.5,                       // seconds
-  "end": 47.8
+  "start": 152.0,    // seconds — only present for M2M (ground-truth clip interval)
+  "end":   168.0     // seconds — only present for M2M
 }
 ```
 
-The Oracle baseline (`baselines/oracle/run.py`) uses the intervals as an upper-bound reference.
+### Where to put what
 
-### Molmo-2 Captions
-
-1000 caption + clip-interval pairs used for caption retrieval. The "question" field carries the caption text and `options` is empty.
+By default the configs reference ``${TOOLMERGE_DATA_DIR}``. With
 
 ```
-${TOOLMERGE_DATA_DIR}/m2m/captions_1k.json
+TOOLMERGE_DATA_DIR=/your/path/datasets
 ```
 
-Item schema:
+the expected layout is:
+
+```
+${TOOLMERGE_DATA_DIR}/
+├── m2m/
+│   ├── test.json                           # 999 items (paper test set)
+│   ├── val.json                            # 997 items (human-verified val)
+│   ├── captions_1k.json                    # 1000 caption + clip-interval pairs
+│   ├── video_durations.json
+│   └── videos/                             # 1356 source mp4s (test ∪ val ∪ captions)
+├── longvideobench/
+│   ├── lvb_val_std.json                    # Long Video Bench val set
+│   └── videos/                             # source mp4s
+└── video_mme/
+    ├── video_mme_short.json
+    ├── video_mme_med.json
+    ├── video_mme_long.json
+    └── videos/
+```
+
+### Sources
+
+- **M2M (Molmo-2 Moments)** — released alongside this repo on Hugging Face
+  Hub at [michalsr/molmo2-moments](https://huggingface.co/datasets/michalsr/molmo2-moments).
+  Built from the [Molmo-2 Captioning Dataset](https://huggingface.co/datasets/allenai/molmo2-captions);
+  see paper Section 4 for the 8-step construction pipeline.
+
+  ```bash
+  huggingface-cli download michalsr/molmo2-moments --repo-type dataset \
+      --local-dir $TOOLMERGE_DATA_DIR/m2m
+  ```
+
+  The HF dataset includes the JSONs **and** the 1356 source `.mp4` files
+  under `videos/`. License: CC-BY-NC-SA-4.0. The Oracle baseline uses the
+  `[start, end]` intervals as an upper-bound reference (Table 3).
+
+- **Long Video Bench** — see
+  [LongVideoBench/longvideobench](https://huggingface.co/datasets/longvideobench/LongVideoBench).
+  Use the ``val_std`` split. Videos are NOT redistributed by this repo.
+
+- **Video-MME** — see
+  [lmms-lab/Video-MME](https://huggingface.co/datasets/lmms-lab/Video-MME).
+  Paper uses no-subtitle mode (``video_mme_{short,med,long}.json`` formats
+  match what the paper's runs consumed). Videos are NOT redistributed by
+  this repo.
+
+### Caption retrieval (M2M)
+
+`${TOOLMERGE_DATA_DIR}/m2m/captions_1k.json` is 1000 caption + clip-interval
+pairs used for caption retrieval. The `question` field carries the caption
+text and `options` is empty:
 
 ```json
 {
@@ -352,7 +389,8 @@ Item schema:
 }
 ```
 
-Caption retrieval scores hit@K over the planner's selected frames vs the GT interval — see `configs/m2m/caption_retrieval.yaml`.
+Caption retrieval scores hit@K over the planner's selected frames vs. the GT
+interval — see `configs/m2m/caption_retrieval.yaml`.
 
 ## Bring your own dataset
 
