@@ -175,7 +175,17 @@ torchrun --nnodes=1 --nproc_per_node=4 -m training.train \
     trl.output_dir=outputs/grpo/m2m
 ```
 
-The paper's released checkpoint is `global_step=50` of this run.
+The paper's released checkpoint is `global_step=50` of this run. It is
+available on the Hugging Face Hub at
+[michalsr/toolmerge-planner-grpo](https://huggingface.co/michalsr/toolmerge-planner-grpo):
+
+```bash
+huggingface-cli download michalsr/toolmerge-planner-grpo \
+    --local-dir checkpoints/grpo-step50
+
+toolmerge config=configs/m2m/qwen3_8.yaml \
+    model.base=checkpoints/grpo-step50
+```
 
 ## Common CLI overrides
 

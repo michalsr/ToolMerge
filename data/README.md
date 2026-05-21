@@ -31,11 +31,11 @@ the expected layout is:
 ```
 ${TOOLMERGE_DATA_DIR}/
 ├── m2m/
-│   ├── train.json                          # ~9.7K items (full M2M train split)
-│   ├── val.json                            # 748 items (human-verified)
-│   ├── test.json                           # 756 items (human-verified)
-│   ├── captions_1k.json                    # 1000 captions for Table 5
-│   └── video_durations.json
+│   ├── test.json                           # 999 items (paper test set)
+│   ├── val.json                            # 997 items (human-verified val)
+│   ├── captions_1k.json                    # 1000 caption + clip-interval pairs
+│   ├── video_durations.json
+│   └── videos/                             # 1356 source mp4s (test ∪ val ∪ captions)
 ├── longvideobench/
 │   ├── lvb_val_std.json                    # Long Video Bench val set
 │   └── videos/                             # source mp4s
@@ -48,13 +48,18 @@ ${TOOLMERGE_DATA_DIR}/
 
 ## Sources
 
-- **M2M (Molmo-2 Moments)** — released alongside this repo on Hugging Face Hub.
+- **M2M (Molmo-2 Moments)** — released alongside this repo on Hugging Face Hub
+  at [michalsr/molmo2-moments](https://huggingface.co/datasets/michalsr/molmo2-moments).
   Built from the [Molmo-2 Captioning Dataset](https://huggingface.co/datasets/allenai/molmo2-captions);
   see the paper Section 4 for the 8-step construction pipeline.
 
   ```bash
-  huggingface-cli download <user>/molmo2-moments --local-dir $TOOLMERGE_DATA_DIR/m2m
+  huggingface-cli download michalsr/molmo2-moments --repo-type dataset \
+      --local-dir $TOOLMERGE_DATA_DIR/m2m
   ```
+
+  The HF dataset ships the JSONs **and** the 1356 source `.mp4` files under
+  `videos/`. License: CC-BY-NC-SA-4.0.
 
 - **Long Video Bench** — see
   [LongVideoBench/longvideobench](https://huggingface.co/datasets/longvideobench/LongVideoBench).
@@ -67,7 +72,11 @@ ${TOOLMERGE_DATA_DIR}/
 
 ## Source videos
 
-Source mp4s are NOT redistributed by this repo. Use the original dataset
-download instructions linked above. The cache build scripts in
-``cache_build/`` consume the mp4s and produce the SigLIP / T-REN / OCR /
-frame caches the inference pipeline reads.
+- **M2M videos** are redistributed alongside the dataset on HF at
+  [michalsr/molmo2-moments](https://huggingface.co/datasets/michalsr/molmo2-moments)
+  under `videos/<video_id>.mp4` (1356 files, ~297 GB).
+- **Long Video Bench / Video-MME videos** are NOT redistributed by this repo.
+  Use the original dataset download instructions linked above.
+
+The cache build scripts in `cache_build/` consume the mp4s and produce the
+SigLIP / T-REN / OCR / frame caches the inference pipeline reads.
