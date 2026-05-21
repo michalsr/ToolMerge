@@ -60,6 +60,7 @@ configs/
   default.yaml            # parent config inherited by every per-row YAML
   {lvb,m2m,vmme}/         # per-row YAMLs, one subdir per dataset (see "Configs")
   smoke.yaml              # tiny smoke run on M2M val
+paper_keyframes/          # per-paper-row keyframe selections (see paper_keyframes/README.md)
 scripts/                  # standalone helper scripts (caption retrieval eval, etc.)
 tests/                    # unit tests (`pytest tests/`)
 ```
@@ -226,6 +227,18 @@ toolmerge config=configs/lvb/qwen3_32.yaml \
 ```
 
 `data.source_dir` also accepts any baseline's `keyframes.json` directory — every baseline emits the same shape (`uid, video_id, question, options, ground_truth, frames_used, timestamps_used`), so the same command runs the toolmerge answerer over those keyframes.
+
+### Paper-row keyframes
+
+[`paper_keyframes/`](paper_keyframes/) ships one `keyframes.json` per paper row (LVB/Video-MME/M2M × Qwen3/GPT-4o × 8/32). Point `data.source_dir` at any of those directories to reproduce the paper accuracy in answerer-only mode (no GPU planner / tools needed):
+
+```bash
+toolmerge config=configs/lvb/qwen3_32.yaml \
+    data.source_dir=paper_keyframes/lvb_qwen3_32 \
+    data.save_path=outputs/lvb_qwen3_32_reanswer
+```
+
+See [paper_keyframes/README.md](paper_keyframes/README.md) for the full per-row mapping (item counts, reported accuracy, source dirs).
 
 ## Baselines
 
