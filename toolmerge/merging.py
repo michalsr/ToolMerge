@@ -8,8 +8,7 @@ score using boolean operators:
     OR  = max(scores)   # best-ranked tool wins; frame must rank well on ANY
 
 The combine expression supports `Q1`, `Q2`, ... query IDs, the AND/OR
-operators, and parentheses. AND binds tighter than OR. No temporal
-BEFORE/AFTER filter — prompt v7_no_temporal does not emit a temporal field.
+operators, and parentheses. AND binds tighter than OR.
 """
 
 from __future__ import annotations

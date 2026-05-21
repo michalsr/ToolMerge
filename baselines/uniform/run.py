@@ -1,11 +1,13 @@
-"""Uniform sampling baseline.
+"""Uniform sampling baseline (end-to-end).
 
-Picks K frames evenly spaced over the full video. Reads the mp4 directly with
-cv2 (no feature caches needed) and writes indices in target-fps space so the
-shared answerer's ``extract_cv2`` recovers the same pixel frames.
+Picks K frames evenly spaced over the full video with ``np.linspace`` in
+native-frame space, decodes them with cv2, and calls the toolmerge answerer
+directly. No feature caches, no two-step handoff — writes ``results.json``
+and ``accuracy.json``.
 
 Usage:
-    python -m baselines.uniform.run config=configs/m2m/retrieval.yaml
+    python -m baselines.uniform.run config=configs/lvb/qwen3_8.yaml \
+        data.save_path=outputs/uniform_lvb_8
 """
 
 from __future__ import annotations
@@ -15,10 +17,14 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import cv2
+import numpy as np
+import torch
 
+from toolmerge.answerer import generate_answer
+from toolmerge.backends import OpenAIBackend, Qwen3VLBackend
 from toolmerge.config import ToolMergeConfig, get_config_path_from_cli, load_config, save_config
 from toolmerge.inputs import item_uid, load_dataset
 
@@ -41,10 +47,44 @@ def find_video(video_dir: str, video_id: str) -> str:
     raise FileNotFoundError(f"No video for {video_id!r} under {video_dir}")
 
 
-def video_nframes_at_fps(video_path: str, target_fps: float, frame_factor: int = 2) -> int:
-    """Mirrors cache_build/utils.py:get_frame_indices nframes math: floor to a
-    multiple of FRAME_FACTOR=2 (Qwen convention) so the uniform grid lines up
-    with the SigLIP/T-REN/OCR cache grids if they ever get built."""
+def build_backend(cfg: ToolMergeConfig):
+    if cfg.model_backend == "openai":
+        return OpenAIBackend(
+            model_name=cfg.openai.model_name,
+            api_endpoint=cfg.openai.api_endpoint,
+            use_azure=cfg.openai.use_azure,
+            max_retries=cfg.openai.max_retries,
+        )
+    from toolmerge.run import load_qwen3_vl
+    model, processor = load_qwen3_vl(cfg)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    return Qwen3VLBackend(model, processor, device=device)
+
+
+def linspace_native_indices(n_total: int, k: int) -> List[int]:
+    if k >= n_total:
+        return list(range(n_total))
+    return np.linspace(0, n_total - 1, k).astype(int).tolist()
+
+
+def decode_frames(video_path: str, native_indices: List[int]) -> torch.Tensor:
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise RuntimeError(f"Cannot open video: {video_path}")
+    frames = []
+    for idx in native_indices:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+        ret, frame = cap.read()
+        if not ret:
+            cap.release()
+            raise RuntimeError(f"Failed to read frame {idx} from {video_path}")
+        rgb = frame[:, :, ::-1].copy()
+        frames.append(torch.from_numpy(rgb).permute(2, 0, 1))
+    cap.release()
+    return torch.stack(frames)
+
+
+def video_metadata(video_path: str):
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise RuntimeError(f"Cannot open video: {video_path}")
@@ -53,31 +93,37 @@ def video_nframes_at_fps(video_path: str, target_fps: float, frame_factor: int =
     cap.release()
     if native_fps <= 0 or n_total <= 0:
         raise RuntimeError(f"Bad video metadata for {video_path}: fps={native_fps} total={n_total}")
-    nframes = n_total / native_fps * target_fps
-    nframes = min(nframes, n_total)
-    nframes = (int(nframes) // frame_factor) * frame_factor
-    return max(int(nframes), frame_factor)
+    return native_fps, n_total
 
 
-def run_one(item: dict, cfg: ToolMergeConfig, target_fps: float) -> Dict[str, Any]:
+def run_one(item: dict, cfg: ToolMergeConfig, backend) -> Dict[str, Any]:
     video_id = item["video_id"]
     uid = item_uid(item)
     video_path = find_video(cfg.data.video_dir, video_id)
-    n = video_nframes_at_fps(video_path, target_fps)
+    native_fps, n_total = video_metadata(video_path)
 
     k = cfg.max_final_k
-    if k >= n:
-        indices = list(range(n))
-    else:
-        indices = [int(i * n / k) for i in range(k)]
-    timestamps = [i / target_fps for i in indices]
+    indices = linspace_native_indices(n_total, k)
+    timestamps = [idx / native_fps for idx in indices]
 
+    frames = decode_frames(video_path, indices)
+    res = generate_answer(
+        frames, timestamps,
+        question=item["question"], options=item["options"],
+        backend=backend, cfg=cfg.answer_generator,
+    )
+    gt = item.get("answer")
+    is_correct = res["answer"] == gt
     return {
         "uid": uid,
         "video_id": video_id,
         "question": item["question"],
         "options": item["options"],
-        "ground_truth": item.get("answer"),
+        "ground_truth": gt,
+        "answer": res["answer"],
+        "correct": is_correct,
+        "confidence": res["confidence"],
+        "answer_raw": res["raw_response"],
         "frames_used": indices,
         "timestamps_used": timestamps,
     }
@@ -86,25 +132,37 @@ def run_one(item: dict, cfg: ToolMergeConfig, target_fps: float) -> Dict[str, An
 def main():
     setup_logging()
     cfg = load_config(get_config_path_from_cli(), ToolMergeConfig)
-    target_fps = float(cfg.target_fps or 2.0)
     save_dir = cfg.data.save_path
     os.makedirs(save_dir, exist_ok=True)
     save_config(cfg, os.path.join(save_dir, "config.yaml"))
 
+    backend = build_backend(cfg)
     items = load_dataset(cfg.data.input_path, cfg.data.start_idx, cfg.data.end_idx)
-    logger.info("Uniform on %d items (K=%d, target_fps=%.1f)", len(items), cfg.max_final_k, target_fps)
+    logger.info("Uniform on %d items (K=%d)", len(items), cfg.max_final_k)
 
-    results = []
+    results: List[Dict[str, Any]] = []
+    correct = total = 0
     t_start = time.time()
-    for item in items:
+    for i, item in enumerate(items):
         try:
-            results.append(run_one(item, cfg, target_fps))
+            r = run_one(item, cfg, backend)
         except Exception as e:  # noqa: BLE001
-            logger.error("  Error on %s: %s", item.get("video_id"), e)
-    out = os.path.join(save_dir, "keyframes.json")
-    with open(out, "w") as f:
+            logger.error("  Error on %s: %s", item.get("video_id"), e, exc_info=True)
+            continue
+        results.append(r)
+        total += 1
+        if r["correct"]:
+            correct += 1
+        if (i + 1) % 50 == 0:
+            logger.info("[%d/%d] acc=%.1f%% (%d/%d)", i + 1, len(items),
+                        100 * correct / max(total, 1), correct, total)
+
+    with open(os.path.join(save_dir, "results.json"), "w") as f:
         json.dump(results, f, indent=2, default=str)
-    logger.info("Wrote %d keyframes to %s (%.0fs)", len(results), out, time.time() - t_start)
+    acc = correct / total if total else 0.0
+    with open(os.path.join(save_dir, "accuracy.json"), "w") as f:
+        json.dump({"correct": correct, "total": total, "accuracy": round(acc, 4)}, f, indent=2)
+    logger.info("Done: %d items, acc=%.1f%%, elapsed=%.0fs", total, acc * 100, time.time() - t_start)
 
 
 if __name__ == "__main__":

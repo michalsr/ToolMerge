@@ -28,7 +28,7 @@ pip install -e .
 ./scripts/download_tren_weights.sh
 
 # 2. Run one paper-row config on a single GPU
-toolmerge config=configs/lvb/qwen3_8.yaml \
+python -m toolmerge.run config=configs/lvb/qwen3_8.yaml \
     data.start_idx=0 data.end_idx=10 \
     data.save_path=outputs/smoke_lvb
 ```
@@ -50,7 +50,7 @@ toolmerge/                # core method package
   inputs.py               # plain JSON dataset I/O + resume-on-restart
   backends/               # qwen3vl (local) + openai (Azure/OpenAI)
   tools/                  # siglip / tren / ocr / scoring
-  prompts/                # planner (v7_no_temporal) + answerer (lif, v1) + ocr_judge
+  prompts/                # planner  + answerer + ocr_judge
 
 tren/                     # T-REN model code (weights via download script)
 cache_build/              # build SigLIP / T-REN / OCR caches from raw videos
@@ -183,7 +183,7 @@ available on the Hugging Face Hub at
 huggingface-cli download michalsr/toolmerge-planner-grpo \
     --local-dir checkpoints/grpo-step50
 
-toolmerge config=configs/m2m/qwen3_8.yaml \
+python -m toolmerge.run config=configs/m2m/qwen3_8.yaml \
     model.base=checkpoints/grpo-step50
 ```
 
@@ -195,27 +195,27 @@ OmegaConf dotted paths — no extra flags. Examples:
 
 ```bash
 # Run only the first 50 items as a quick check
-toolmerge config=configs/lvb/qwen3_8.yaml \
+python -m toolmerge.run config=configs/lvb/qwen3_8.yaml \
     data.start_idx=0 data.end_idx=50
 
 # Override K and the answerer prompt
-toolmerge config=configs/lvb/qwen3_8.yaml \
+python -m toolmerge.run config=configs/lvb/qwen3_8.yaml \
     max_final_k=16 answer_generator.prompt_template=lif
 
 # Swap to a fine-tuned planner checkpoint
-toolmerge config=configs/lvb/qwen3_8.yaml \
+python -m toolmerge.run config=configs/lvb/qwen3_8.yaml \
     model.base=/path/to/grpo-ckpt-step50
 
 # Reanswer a baseline's `keyframes.json` with the toolmerge answerer
-toolmerge config=configs/lvb/qwen3_8.yaml \
+python -m toolmerge.run config=configs/lvb/qwen3_8.yaml \
     data.source_dir=outputs/wfs_lvb_8
 
 # Ablate a tool (drop OCR; keep SigLIP + T-REN)
-toolmerge config=configs/lvb/qwen3_8.yaml \
+python -m toolmerge.run config=configs/lvb/qwen3_8.yaml \
     enabled_tools=[siglip,tren] ocr_cache_dir=""
 
 # Resume a partial run — pick up where results.json left off (no flag needed)
-toolmerge config=configs/lvb/qwen3_8.yaml \
+python -m toolmerge.run config=configs/lvb/qwen3_8.yaml \
     data.save_path=outputs/lvb_qwen3_8     # same path as before
 ```
 
@@ -227,11 +227,11 @@ A `toolmerge.run` invocation runs the full planner → tools → merge → NMS �
 
 ```bash
 # 1. Full pipeline at K=8 (saves trace with pooled_candidates_{8,16,32,64})
-toolmerge config=configs/lvb/qwen3_8.yaml \
+python -m toolmerge.run config=configs/lvb/qwen3_8.yaml \
     data.save_path=outputs/lvb_qwen3_8
 
 # 2. Reanswer the same questions at K=32 — only the answerer runs
-toolmerge config=configs/lvb/qwen3_32.yaml \
+python -m toolmerge.run config=configs/lvb/qwen3_32.yaml \
     data.source_dir=outputs/lvb_qwen3_8 \
     data.save_path=outputs/lvb_qwen3_32
 ```
@@ -243,7 +243,7 @@ toolmerge config=configs/lvb/qwen3_32.yaml \
 [`paper_keyframes/`](paper_keyframes/) contains one `keyframes.json` per paper row (LVB/Video-MME/M2M × Qwen3/GPT-4o × 8/32). Point `data.source_dir` at any of those directories to reproduce the paper accuracy in answerer-only mode (no GPU planner / tools needed):
 
 ```bash
-toolmerge config=configs/lvb/qwen3_32.yaml \
+python -m toolmerge.run config=configs/lvb/qwen3_32.yaml \
     data.source_dir=paper_keyframes/lvb_qwen3_32 \
     data.save_path=outputs/lvb_qwen3_32_reanswer
 ```
@@ -252,17 +252,24 @@ See [paper_keyframes/README.md](paper_keyframes/README.md) for the full per-row 
 
 ## Baselines
 
-Code to reproduce the comparison methods lives under `baselines/`. Each method writes `keyframes.json` in a shared shape; the toolmerge answerer consumes it via `data.source_dir`. Example:
+Code to reproduce the comparison methods lives under `baselines/`. Uniform, Oracle, and Blind Text are end-to-end — they pick frames and call the answerer themselves, writing `results.json` directly:
 
 ```bash
-# 1. Pick keyframes with one baseline (here: Uniform)
 python -m baselines.uniform.run config=configs/lvb/qwen3_8.yaml \
     data.save_path=outputs/uniform_lvb_8
+```
+
+The scored baselines write `keyframes.json` and hand off to the toolmerge answerer via `data.source_dir`:
+
+```bash
+# 1. Pick keyframes with a scored baseline (here: SigLIP-Q)
+python -m baselines.siglip_q.run config=configs/lvb/qwen3_8.yaml \
+    data.save_path=outputs/siglipq_lvb_8
 
 # 2. Run the toolmerge answerer over those keyframes
-toolmerge config=configs/lvb/qwen3_8.yaml \
-    data.source_dir=outputs/uniform_lvb_8 \
-    data.save_path=outputs/uniform_lvb_8_answered
+python -m toolmerge.run config=configs/lvb/qwen3_8.yaml \
+    data.source_dir=outputs/siglipq_lvb_8 \
+    data.save_path=outputs/siglipq_lvb_8_answered
 ```
 
 | Method | Where | Notes |
@@ -379,7 +386,7 @@ To run ToolMerge on a new dataset:
 
 4. **Run it**:
    ```bash
-   toolmerge config=configs/your_dataset/qwen3_8.yaml
+   python -m toolmerge.run config=configs/your_dataset/qwen3_8.yaml
    ```
 
 ## Citation

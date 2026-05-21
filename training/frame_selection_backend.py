@@ -98,7 +98,6 @@ class FrameSelectionBackend:
         combine_expr: str,
         video_id: str,
         uid: str = "",
-        temporal: Optional[dict] = None,
     ) -> Optional[Dict[str, Any]]:
         """Run gather_evidence and return the selected timestamps.
 
@@ -106,7 +105,7 @@ class FrameSelectionBackend:
         Memoised per (uid, plan-hash) so multiple reward fns reuse one pass.
         """
         plan_repr = _json.dumps(
-            {"q": queries, "c": combine_expr, "t": temporal},
+            {"q": queries, "c": combine_expr},
             sort_keys=True, default=str,
         )
         plan_hash = hashlib.md5(plan_repr.encode()).hexdigest()
@@ -148,7 +147,6 @@ class FrameSelectionBackend:
                 video_caches=video_caches,
                 cfg=cfg,
                 ocr_frames=ocr_frames if ocr_frames else None,
-                temporal=temporal,
             )
         except Exception as e:
             logger.warning(color(f"  gather_evidence failed for {video_id}: {e}", "red"))

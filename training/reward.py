@@ -104,7 +104,7 @@ def consistency_reward(
     rewards = []
     for i, completion in enumerate(completions):
         text = extract_text(completion)
-        queries, combine_expr, _temporal = parse_completion_cached(text)
+        queries, combine_expr = parse_completion_cached(text)
 
         if not queries and not combine_expr:
             rewards.append(-1.0)
@@ -236,7 +236,7 @@ def make_frames_in_gt_reward(frame_backend: Any) -> Callable:
                     continue
 
                 text = extract_text(completion)
-                queries, combine_expr, temporal = parse_completion_cached(text)
+                queries, combine_expr = parse_completion_cached(text)
                 if not queries:
                     rewards.append(0.0)
                     logger.debug(color(
@@ -257,7 +257,6 @@ def make_frames_in_gt_reward(frame_backend: Any) -> Callable:
                         combine_expr=combine_expr,
                         video_id=vid,
                         uid=item_uid,
-                        temporal=temporal,
                     )
                 except Exception as e:
                     logger.warning(color(

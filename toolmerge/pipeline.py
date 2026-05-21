@@ -3,9 +3,10 @@
 Flow per question:
     1. Run the planner (text-only) to get tool calls + AND/OR combine.
     2. Score every frame with each tool, normalize to percentile ranks.
-    3. Run the OCR judge over per-frame OCR text.
+    3. Read OCR-judge frames from the per-question cache
+       (built offline by ``cache_build/ocr_judge.py``; a miss skips OCR).
     4. Combine per-query scores via the AND/OR expression; inject OCR frames
-       at rank 1; threshold; per-pool greedy NMS with τ = min(D/(2K), 10).
+       at rank 1; per-pool greedy NMS with τ = min(D/(2K), 10).
     5. Pass the top-K frames (in temporal order) to the answerer.
 """
 
@@ -32,14 +33,12 @@ from toolmerge.answerer import generate_answer
 logger = logging.getLogger(__name__)
 
 
-# --- Legacy-API shims (consumed by ``training/``) -----------------------
+# --- Shared helpers (also used by training/) -----------------------------
 
 def sample_uniform_frames(frames_all, fps, n_frames):
     """Uniformly sample ``n_frames`` from ``frames_all`` (or ``None`` if no frames).
 
-    Returns ``(frames_tensor, timestamps_list)``. Kept on this module for the
-    GRPO trainer, which calls it for planner-overview frames in non-text-only
-    prompts.
+    Returns ``(frames_tensor, timestamps_list)``.
     """
     if n_frames <= 0 or frames_all is None or len(frames_all) == 0:
         return None, None
@@ -54,15 +53,10 @@ def gather_evidence(
     video_caches,
     cfg,
     ocr_frames=None,
-    temporal=None,
 ):
-    """Legacy single-function API for the training package.
+    """Score queries → combine → inject OCR → select frames.
 
-    Composes ``score_queries`` → ``combine`` → ``inject_ocr_frames`` →
-    ``select_frames``. Returns ``(frames_tensor or None, timestamps, debug)``
-    matching the original ``evidence_gatherer.gather_evidence`` signature.
-    ``temporal`` is accepted for back-compat but ignored (the paper's prompt
-    never emits a temporal field).
+    Returns ``(frames_tensor or None, timestamps, debug)``.
     """
     fps = video_caches["fps"]
     frames_all = video_caches.get("frames")
@@ -175,7 +169,7 @@ def select_frames(
     num_frames: int,
     cfg: Any,
 ) -> Tuple[List[int], List[float], Dict[str, Any]]:
-    """Apply threshold + per-pool greedy NMS, then return the top-K final frames."""
+    """Apply per-pool greedy NMS and return the top-K final frames."""
     selection: Dict[str, Any] = {}
 
     selection["all_scores"] = [
