@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI dispatcher: build SigLIP / T-REN / OCR / OCR-judge caches for a directory of videos.
+"""CLI: build SigLIP / T-REN / OCR / OCR-judge caches for a directory of videos.
 
 The per-modality builders live in their own files:
   - ``cache_build/siglip.py``     -> SigLIP-2 frame features

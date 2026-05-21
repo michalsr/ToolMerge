@@ -1,11 +1,5 @@
 """Image-only Qwen3-VL processing for ToolMerge.
 
-Copied from the research tree (``time_r1/utils/qwen_vl_utils.py``) to avoid
-a dependency on the upstream ``qwen-vl-utils`` package. The ToolMerge answerer
-always builds messages with pre-decoded PIL frames, so only the image branch
-of ``process_vision_info`` is exercised — every video helper from the research
-copy has been removed, and the Qwen2.5 code paths were dropped since the paper
-runs on Qwen3-VL.
 
 Usage:
     from toolmerge.qwen_vl_utils import process_vision_info
@@ -203,13 +197,7 @@ def process_vision_info(
     a trivial dict; both are returned so the unpacking in ``Qwen3VLBackend``
     matches the upstream call site.
 
-    NOTE: ``image_patch_size`` defaults to 14 (the Qwen2.5 value). For Qwen3-VL
-    the correct patch size is 16 (factor=32), so the pre-resize uses factor=28
-    instead of 32. In practice this is harmless: the HF AutoProcessor re-resizes
-    to factor=32 internally, so the final token count is identical. Verified
-    empirically: a 420x280 (28-aligned) image and a 416x288 (32-aligned) image
-    both produce grid [1,18,26] = 468 tokens.
-    """
+       """
     vision_infos = extract_vision_info(conversations)
     image_inputs: List[Image.Image] = []
 

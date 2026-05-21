@@ -4,10 +4,6 @@ Both tools return a per-frame percentile rank in [0, 1] (best frame = 1.0).
 This makes scores cross-tool comparable so the AND/OR merge in
 ``toolmerge.merging`` can combine them by min / max.
 
-Sources:
-    `evidence_pipeline_v2/tool_scoring.py`
-    `time_r1/utils/clip_service.py::SiglipClient`
-    `time_r1/utils/tren_client.py::TrenClient`
 """
 
 from __future__ import annotations

@@ -197,10 +197,10 @@ def select_frames(
         else:
             gap_sec = min_gap_sec
         gap_frames = int(gap_sec * fps) if gap_sec > 0 else 0
-        if gap_frames > 0 and len(surviving) > final_k:
-            selected = greedy_gap_select(surviving, final_k, gap_frames)
+        if gap_frames > 0 and len(combined_scores) > final_k:
+            selected = greedy_gap_select(combined_scores, final_k, gap_frames)
         else:
-            top_k = sorted(surviving.items(), key=lambda x: x[1], reverse=True)[:final_k]
+            top_k = sorted(combined_scores.items(), key=lambda x: x[1], reverse=True)[:final_k]
             selected = dict(top_k)
 
     indices = ordered_by_time(selected)

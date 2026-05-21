@@ -4,7 +4,7 @@ Produces chat-formatted messages compatible with TRL's GRPOTrainer.
 Extra columns (video_id, answer, options, etc.) are passed as kwargs
 to reward functions.
 
-Frame loading: cache-first with decord fallback.
+
 """
 
 import json

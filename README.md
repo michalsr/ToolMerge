@@ -53,7 +53,7 @@ toolmerge/                # core method package
   prompts/                # planner  + answerer + ocr_judge
 
 tren/                     # T-REN model code (weights via download script)
-cache_build/              # build SigLIP / T-REN / OCR caches from raw videos
+cache_build/              # build SigLIP / T-REN / OCR / OCR Judge caches from raw videos
 baselines/                # comparison keyframe-selectors (see below)
 training/                 # GRPO post-training (TRL)
 configs/
@@ -111,7 +111,7 @@ ToolMerge has two phases that touch different code paths:
 │   per-frame features (no image processing at runtime):                                                │
 │       toolmerge/tools/siglip.py:SiglipClient.encode_texts   ─┐                                        │
 │       toolmerge/tools/tren.py:TrenClient.encode_text         ├─> per-frame scores                     │
-│       toolmerge/tools/ocr_judge.py:judge_ocr_relevance       ─┘   (LLM call over cached OCR strings)  │
+│       toolmerge/tools/ocr_judge.py:load_judge_cache          ─┘   (read pre-built {uid}.json; no LLM) │
 │                                                                                                       │
 │   AND/OR-merge ──> greedy NMS ──> K keyframes ──> answerer VLM (Qwen3-VL or GPT-4o)                   │
 └───────────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -121,7 +121,7 @@ ToolMerge has two phases that touch different code paths:
 
 **Runtime:**  SigLIP-2 / T-REN models only encode the planner's short text queries; the answerer VLM is the only model that ever sees image pixels at runtime, and only for the K selected frames. Everything else is a dot product against precomputed features.
 
-The same `toolmerge/tools/{siglip,tren,ocr_judge}.py` clients are imported by both phases — the cache builders use their image-encoding methods, the runtime pipeline uses their text-encoding (or LLM-judge) methods. Same is true at training reward time: [`training/frame_selection_backend.py`](training/frame_selection_backend.py) loads the same caches via `caches_for_video` and runs `gather_evidence`, identical to the inference path.
+The same `toolmerge/tools/{siglip,tren,ocr_judge}.py` clients are imported by both phases — the cache builders use their image-encoding methods (and the OCR-judge LLM at build time); the runtime pipeline uses their text-encoding methods and reads the pre-built OCR-judge cache. Same is true at training reward time: [`training/frame_selection_backend.py`](training/frame_selection_backend.py) loads the same caches via `caches_for_video` and runs `gather_evidence`, identical to the inference path.
 
 ## Building the per-video caches
 
@@ -153,9 +153,22 @@ Per-tool commands and chunking flags are in `cache_build/README.md`.
 
 ### OCR judge cache (per-question)
 
-`ocr_judge/<dataset>/{uid}.json` is per-question and built lazily on first
-inference: the OCR-judge LLM call writes its decisions to the cache so reruns
-hit it instead of re-querying the LLM. No pre-build step required.
+`ocr_judge/<dataset>/{uid}.json` is per-question and **must be pre-built**:
+the inference pipeline only reads it (a cache miss skips OCR for that
+question). Build it with the same dispatcher after the per-frame OCR cache
+exists:
+
+```bash
+python -m cache_build.build_caches \
+    --video_dir              /path/to/longvideobench/videos \
+    --dataset_json           /path/to/lvb_val_std.json \
+    --tools                  ocr_judge \
+    --ocr_judge_input_dir    ${TOOLMERGE_CACHE_DIR}/ocr/longvideobench \
+    --ocr_judge_output_dir   ${TOOLMERGE_CACHE_DIR}/ocr_judge/longvideobench
+```
+
+`--dataset_json` is mandatory here (the judge is per-question). See
+`cache_build/README.md` for backend / model-name / batch-size flags.
 
 ## Training (planner GRPO)
 

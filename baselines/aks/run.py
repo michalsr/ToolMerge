@@ -5,8 +5,8 @@ relevance curve as raw SigLIP-2 cosine similarity between the
 ``question + concatenated options`` query and the cached frame embeddings,
 then recursively split the curve and take top-N per surviving segment.
 
-Standalone: no imports from ``toolmerge``. The ``meanstd`` recursive
-split + ``aks`` driver are copied verbatim from upstream AKS
+ The ``meanstd`` recursive
+split + ``aks`` driver are copied verbatim from AKS
 (https://github.com/ncTimTang/AKS/blob/main/frame_select.py).
 
 Hyperparameters (paper defaults):

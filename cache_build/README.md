@@ -22,7 +22,7 @@ All caches are at ``target_fps=2`` (matching the paper).
 
 ## Building
 
-One CLI dispatches all tools — pass the ones you need:
+One CLI for all tools — pass the ones you need:
 
 ```bash
 python -m cache_build.build_caches \

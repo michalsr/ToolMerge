@@ -1,6 +1,6 @@
 """Frame-selection backend for GRPO reward computation.
 
-Runs the EP v2 evidence-gathering pipeline (load_video_caches → OCR judge →
+Runs the pipeline (load_video_caches → OCR judge →
 gather_evidence) to convert a planner output into a list of selected frame
 timestamps. No answerer VLM is loaded — the reward depends only on which
 frames the planner selected, not on whether they yield a correct answer.

@@ -2,8 +2,7 @@
 
 Picks K frames evenly spaced over the full video with ``np.linspace`` in
 native-frame space, decodes them with cv2, and calls the toolmerge answerer
-directly. No feature caches, no two-step handoff — writes ``results.json``
-and ``accuracy.json``.
+directly.
 
 Usage:
     python -m baselines.uniform.run config=configs/lvb/qwen3_8.yaml \

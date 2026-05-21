@@ -5,7 +5,7 @@ We compute the curve as raw SigLIP-2 cosine similarity between the
 ``question + concatenated options`` query and the cached frame embeddings,
 then sample K indices from the relevance CDF.
 
-Standalone: no imports from ``toolmerge``. The ``inverse_transform_sampling``
+ The ``inverse_transform_sampling``
 function is copied verbatim from
 https://github.com/sming256/BOLT/blob/main/select_frames.py (lines 76-94 in
 the local clone at /work/hdd/bcgp/michal5/BOLT/select_frames.py).

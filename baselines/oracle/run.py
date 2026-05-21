@@ -2,10 +2,7 @@
 
 Samples K frames uniformly with ``np.linspace`` from inside the ground-truth
 clip interval ``[item["start"], item["end"]]`` (seconds), decodes them with
-cv2, and calls the toolmerge answerer directly. No feature caches, no two-step
-handoff — writes ``results.json`` and ``accuracy.json``. Only meaningful on
-benchmarks with clip-level supervision (Molmo-2 Moments) and reported as the
-upper-bound reference in Table 3.
+cv2, and calls the toolmerge answerer directly. 
 
 Usage:
     python -m baselines.oracle.run config=configs/m2m/qwen3_8.yaml \

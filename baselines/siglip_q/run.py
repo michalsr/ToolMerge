@@ -4,8 +4,6 @@ Encodes ``question + concatenated answer choices`` with SigLIP-2, scores every
 video frame by raw cosine similarity, then applies greedy NMS with the paper's
 auto-tau = min(D/(2K), 10s) rule.
 
-Standalone: no imports from ``toolmerge``. The greedy NMS implementation is
-copied verbatim from ``toolmerge/selection.py`` so this file runs on its own.
 
 Usage:
     python -m baselines.siglip_q.run config=configs/lvb/qwen3_8.yaml
