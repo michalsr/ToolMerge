@@ -149,7 +149,7 @@ def load_with_defaults(path: str):
 
     Supports Hydra-style inheritance for the per-table configs:
 
-        # configs/tables/table4.yaml
+        # configs/m2m/retrieval.yaml
         defaults:
           - ../default        # path relative to this file, no .yaml suffix
         data:

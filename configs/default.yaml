@@ -1,5 +1,5 @@
-# Parent config inherited by every per-table YAML under configs/tables/.
-# Override any field in the table-specific YAML (e.g. `defaults: [- ../default]`)
+# Parent config inherited by every per-dataset YAML under configs/{lvb,m2m,vmme}/.
+# Override any field in the dataset-specific YAML (e.g. `defaults: [- ../default]`)
 # or at the CLI via dotted overrides (e.g. `max_final_k=32`).
 # Env vars below (TOOLMERGE_DATA_DIR / TOOLMERGE_CACHE_DIR / TOOLMERGE_OUTPUT_DIR
 # and OPENAI/AZURE_OPENAI_*) are optional — defaults are relative `./data` etc.

@@ -31,7 +31,7 @@ pip install -e .
 ./scripts/download_tren_weights.sh
 
 # 2. Run one paper-row config on a single GPU
-toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
+toolmerge config=configs/lvb/qwen3_8.yaml \
     data.start_idx=0 data.end_idx=10 \
     data.save_path=outputs/smoke_lvb
 ```
@@ -60,23 +60,23 @@ cache_build/              # build SigLIP / T-REN / OCR caches from raw videos
 baselines/                # comparison keyframe-selectors (see below)
 training/                 # GRPO post-training (TRL)
 configs/
-  default.yaml            # parent config inherited by every per-table YAML
-  tables/                 # per-row YAMLs (see "Configs" below)
+  default.yaml            # parent config inherited by every per-row YAML
+  {lvb,m2m,vmme}/         # per-row YAMLs, one subdir per dataset (see "Configs")
+  smoke.yaml              # tiny smoke run on M2M val
 scripts/                  # standalone helper scripts (caption retrieval eval, etc.)
 tests/                    # 25 unit tests
 ```
 
 ## Configs
 
-> **TODO:** rename / restructure the `configs/tables/` files — current names are tied to paper-table numbers (e.g. `table2_*`) which won't make sense once tables get reordered or split. Move to a flatter scheme like `configs/{dataset}/{answerer}_{K}.yaml` before public release.
-
-All per-row configs currently live under `configs/tables/` and follow:
+Per-row configs are grouped by dataset:
 
 ```
-table{N}_{dataset}_{answerer}_{K}.yaml
+configs/{lvb,m2m,vmme}/{qwen3,gpt4o}_{8,32}.yaml
+configs/m2m/{retrieval,caption_retrieval}.yaml
 ```
 
-- `dataset`: `lvb` (Long Video Bench), `vmme` (Video-MME long), `m2c_v2` (Molmo-2 Moments)
+- `dataset`: `lvb` (Long Video Bench), `vmme` (Video-MME), `m2m` (Molmo-2 Moments)
 - `answerer`: `qwen3` (local Qwen3-VL-8B-Instruct) or `gpt4o` (Azure / OpenAI GPT-4o)
 - `K`: `8` or `32` (final keyframes)
 
@@ -185,28 +185,28 @@ command line via OmegaConf dotted paths — no extra flags. Examples:
 
 ```bash
 # Run only the first 50 items as a quick check
-toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
+toolmerge config=configs/lvb/qwen3_8.yaml \
     data.start_idx=0 data.end_idx=50
 
 # Override K and the answerer prompt
-toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
+toolmerge config=configs/lvb/qwen3_8.yaml \
     max_final_k=16 answer_generator.prompt_template=lif
 
 # Swap to a fine-tuned planner checkpoint
-toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
+toolmerge config=configs/lvb/qwen3_8.yaml \
     model.base=/path/to/grpo-ckpt-step50
 
 # Reanswer a baseline's `keyframes.json` with the toolmerge answerer
-toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
-    data.source_dir=outputs/wfs/table2_lvb_qwen3_8
+toolmerge config=configs/lvb/qwen3_8.yaml \
+    data.source_dir=outputs/wfs_lvb_8
 
 # Ablate a tool (drop OCR; keep SigLIP + T-REN)
-toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
+toolmerge config=configs/lvb/qwen3_8.yaml \
     enabled_tools=[siglip,tren] ocr_cache_dir=""
 
 # Resume a partial run — pick up where results.json left off (no flag needed)
-toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
-    data.save_path=outputs/table2_lvb_qwen3_8     # same path as before
+toolmerge config=configs/lvb/qwen3_8.yaml \
+    data.save_path=outputs/lvb_qwen3_8     # same path as before
 ```
 
 Per-field documentation lives inline in [`configs/default.yaml`](configs/default.yaml).
@@ -217,13 +217,13 @@ A `toolmerge.run` invocation runs the full planner → tools → merge → NMS �
 
 ```bash
 # 1. Full pipeline at K=8 (saves trace with pooled_candidates_{8,16,32,64})
-toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
-    data.save_path=outputs/table2_lvb_qwen3_8
+toolmerge config=configs/lvb/qwen3_8.yaml \
+    data.save_path=outputs/lvb_qwen3_8
 
 # 2. Reanswer the same questions at K=32 — only the answerer runs
-toolmerge config=configs/tables/table2_lvb_qwen3_32.yaml \
-    data.source_dir=outputs/table2_lvb_qwen3_8 \
-    data.save_path=outputs/table2_lvb_qwen3_32
+toolmerge config=configs/lvb/qwen3_32.yaml \
+    data.source_dir=outputs/lvb_qwen3_8 \
+    data.save_path=outputs/lvb_qwen3_32
 ```
 
 `data.source_dir` also accepts any baseline's `keyframes.json` directory — every baseline emits the same shape (`uid, video_id, question, options, ground_truth, frames_used, timestamps_used`), so the same command runs the toolmerge answerer over those keyframes.
@@ -236,11 +236,11 @@ Code to reproduce the comparison methods lives under `baselines/`. Each method w
 
 ```bash
 # 1. Pick keyframes with one baseline (here: Uniform)
-python -m baselines.uniform.run config=configs/tables/table2_lvb_qwen3_8.yaml \
+python -m baselines.uniform.run config=configs/lvb/qwen3_8.yaml \
     data.save_path=outputs/uniform_lvb_8
 
 # 2. Run the toolmerge answerer over those keyframes
-toolmerge config=configs/tables/table2_lvb_qwen3_8.yaml \
+toolmerge config=configs/lvb/qwen3_8.yaml \
     data.source_dir=outputs/uniform_lvb_8 \
     data.save_path=outputs/uniform_lvb_8_answered
 ```
@@ -262,13 +262,15 @@ Per-baseline invocation details and the shared `keyframes.json` schema are in `b
 
 Two evaluation sets ship with this repo, both anchored to per-question time intervals.
 
-### Molmo-2 Moments (`m2c_v2`)
+### Molmo-2 Moments (`m2m`)
 
-Long-video QA — every question has a `[start, end]` ground-truth clip. Used for Tables 2 / 3 and the GRPO training signal.
+Long-video QA — every question has a `[start, end]` ground-truth clip. Used for the M2M paper rows and the GRPO training signal.
 
 ```
-${TOOLMERGE_DATA_DIR}/m2c_v2/
+${TOOLMERGE_DATA_DIR}/m2m/
   test.json                  # QA + clip intervals
+  val.json                   # human-verified val split
+  captions_1k.json           # 1000 caption + clip-interval pairs (caption retrieval)
   videos/                    # source mp4 files
 ```
 
@@ -290,10 +292,10 @@ The Oracle baseline (`baselines/oracle/run.py`) uses the intervals as an upper-b
 
 ### Molmo-2 Captions
 
-1000 caption + clip-interval pairs used for caption retrieval (Table 5). The "question" field carries the caption text and `options` is empty.
+1000 caption + clip-interval pairs used for caption retrieval. The "question" field carries the caption text and `options` is empty.
 
 ```
-${TOOLMERGE_DATA_DIR}/m2c_v2/captions_1k.json
+${TOOLMERGE_DATA_DIR}/m2m/captions_1k.json
 ```
 
 Item schema:
@@ -310,7 +312,7 @@ Item schema:
 }
 ```
 
-Caption retrieval scores hit@K over the planner's selected frames vs the GT interval — see `configs/tables/table5_caption_retrieval.yaml`.
+Caption retrieval scores hit@K over the planner's selected frames vs the GT interval — see `configs/m2m/caption_retrieval.yaml`.
 
 ## Bring your own dataset
 
@@ -324,7 +326,7 @@ To run ToolMerge on a new dataset:
       "answer": "C"}
    ]
    ```
-   `m2c_v2`-style `start` / `end` fields are optional; only the Oracle baseline uses them.
+   `m2m`-style `start` / `end` fields are optional; only the Oracle baseline uses them.
 
 2. **Build the per-video caches** (one-time, on a GPU):
    ```bash
@@ -336,7 +338,7 @@ To run ToolMerge on a new dataset:
 
 3. **Write a config** mirroring an existing one:
    ```yaml
-   # configs/tables/table2_your_dataset_qwen3_8.yaml
+   # configs/your_dataset/qwen3_8.yaml
    defaults:
      - ../default
    data:
@@ -354,7 +356,7 @@ To run ToolMerge on a new dataset:
 
 4. **Run it**:
    ```bash
-   toolmerge config=configs/tables/table2_your_dataset_qwen3_8.yaml
+   toolmerge config=configs/your_dataset/qwen3_8.yaml
    ```
 
 ## License

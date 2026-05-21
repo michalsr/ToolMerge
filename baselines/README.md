@@ -55,10 +55,10 @@ the top-level README for the full build invocation.
 ## Run a baseline
 
 ```bash
-python -m baselines.siglip_q.run config=configs/tables/table2_lvb_qwen3_8.yaml
-python -m baselines.wfs.run      config=configs/tables/table2_lvb_qwen3_8.yaml
-python -m baselines.aks.run      config=configs/tables/table2_lvb_qwen3_8.yaml
-python -m baselines.bolt.run     config=configs/tables/table2_lvb_qwen3_8.yaml
+python -m baselines.siglip_q.run config=configs/lvb/qwen3_8.yaml
+python -m baselines.wfs.run      config=configs/lvb/qwen3_8.yaml
+python -m baselines.aks.run      config=configs/lvb/qwen3_8.yaml
+python -m baselines.bolt.run     config=configs/lvb/qwen3_8.yaml
 ```
 
 Each writes `<cfg.data.save_path>/keyframes.json`. CLI overrides
@@ -72,7 +72,7 @@ answerer by setting `data.source_dir` to the baseline's output directory:
 
 ```bash
 python -m toolmerge.run \
-    config=configs/tables/table2_lvb_qwen3_8.yaml \
+    config=configs/lvb/qwen3_8.yaml \
     data.source_dir=<baseline_save_path> \
     data.save_path=<baseline_save_path>/reanswered
 ```

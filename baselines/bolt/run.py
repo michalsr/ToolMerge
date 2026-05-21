@@ -11,7 +11,7 @@ https://github.com/sming256/BOLT/blob/main/select_frames.py (lines 76-94 in
 the local clone at /work/hdd/bcgp/michal5/BOLT/select_frames.py).
 
 Usage:
-    python -m baselines.bolt.run config=configs/tables/table2_lvb_qwen3_8.yaml
+    python -m baselines.bolt.run config=configs/lvb/qwen3_8.yaml
 """
 
 from __future__ import annotations

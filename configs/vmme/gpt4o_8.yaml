@@ -1,11 +1,11 @@
-# Paper Table 2 — Video-MME (long split), GPT-4o answerer, 8 frames.
+# Video-MME (long split), GPT-4o answerer, 8 frames.
 
 defaults:
   - ../default
 
 data:
   input_path: ${oc.env:TOOLMERGE_DATA_DIR,data}/video_mme/video_mme_long.json
-  save_path: ${oc.env:TOOLMERGE_OUTPUT_DIR,outputs}/table2_vmme_gpt4o_8
+  save_path: ${oc.env:TOOLMERGE_OUTPUT_DIR,outputs}/vmme_gpt4o_8
   video_dir: ${oc.env:TOOLMERGE_DATA_DIR,data}/video_mme/videos
 
 siglip_feature_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/siglip/video_mme

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Reproduce one paper table row locally.
+# Reproduce one paper row locally.
 #
 # Usage:
-#   ./scripts/run_table.sh table2_lvb_qwen3_8
-#   ./scripts/run_table.sh table3_m2m_qa_qwen3_8 max_final_k=8 data.start_idx=0 data.end_idx=10
+#   ./scripts/run_table.sh lvb/qwen3_8
+#   ./scripts/run_table.sh m2m/qwen3_8 max_final_k=8 data.start_idx=0 data.end_idx=10
 #
 # Loads .env if present, validates the named config exists, and runs the CLI.
 
@@ -19,18 +19,18 @@ if [ -f "$ROOT/.env" ]; then
 fi
 
 if [ $# -lt 1 ]; then
-  echo "Usage: $0 <table-config-name> [extra OmegaConf overrides ...]" >&2
+  echo "Usage: $0 <dataset>/<answerer>_<K> [extra OmegaConf overrides ...]" >&2
   exit 1
 fi
 
 NAME="$1"
 shift
-CFG="$ROOT/configs/tables/${NAME}.yaml"
+CFG="$ROOT/configs/${NAME}.yaml"
 
 if [ ! -f "$CFG" ]; then
-  echo "Unknown table config: ${NAME} (no such file at ${CFG})" >&2
+  echo "Unknown config: ${NAME} (no such file at ${CFG})" >&2
   echo "Available:" >&2
-  ls "$ROOT/configs/tables/" >&2
+  ( cd "$ROOT" && find configs -mindepth 2 -name '*.yaml' | sort ) >&2
   exit 1
 fi
 

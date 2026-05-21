@@ -1,4 +1,4 @@
-# Paper Table 2 — Video-MME (full, all 3 length buckets, 2700 questions), Qwen3-VL answerer, 8 frames.
+# Video-MME (full, all 3 length buckets, 2700 questions), Qwen3-VL answerer, 8 frames.
 # VMME 8f uses the `lif` answer template (default).
 
 defaults:
@@ -6,7 +6,7 @@ defaults:
 
 data:
   input_path: ${oc.env:TOOLMERGE_DATA_DIR,data}/video_mme/video_mme_all.json
-  save_path: ${oc.env:TOOLMERGE_OUTPUT_DIR,outputs}/table2_vmme_qwen3_8
+  save_path: ${oc.env:TOOLMERGE_OUTPUT_DIR,outputs}/vmme_qwen3_8
   video_dir: ${oc.env:TOOLMERGE_DATA_DIR,data}/video_mme/videos
 
 siglip_feature_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/siglip/video_mme

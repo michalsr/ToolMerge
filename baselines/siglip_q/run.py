@@ -8,7 +8,7 @@ Standalone: no imports from ``toolmerge``. The greedy NMS implementation is
 copied verbatim from ``toolmerge/selection.py`` so this file runs on its own.
 
 Usage:
-    python -m baselines.siglip_q.run config=configs/tables/table2_lvb_qwen3_8.yaml
+    python -m baselines.siglip_q.run config=configs/lvb/qwen3_8.yaml
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ def load_config_from_cli() -> Any:
     """Read `config=path.yaml` plus dotted `key=value` overrides from sys.argv.
 
     Resolves an optional ``defaults: [- relative/path]`` block one level deep,
-    matching the layout under ``configs/tables/``.
+    matching the layout under ``configs/``.
     """
     config_path: Optional[str] = None
     overrides: List[str] = []

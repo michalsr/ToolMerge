@@ -1,12 +1,12 @@
-# Paper Table 2 — Long Video Bench, Qwen3-VL, 32 frames.
-# Expected accuracy: 67.4% (verified: ra_lvb_32f_q3/ aggregates 901/1337 = 67.39%).
+# Long Video Bench, Qwen3-VL, 32 frames.
+# Paper accuracy: 67.4%.
 
 defaults:
   - ../default
 
 data:
   input_path: ${oc.env:TOOLMERGE_DATA_DIR,data}/longvideobench/lvb_val_std.json
-  save_path: ${oc.env:TOOLMERGE_OUTPUT_DIR,outputs}/table2_lvb_qwen3_32
+  save_path: ${oc.env:TOOLMERGE_OUTPUT_DIR,outputs}/lvb_qwen3_32
 
 siglip_feature_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/siglip/longvideobench
 tren_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/tren/longvideobench

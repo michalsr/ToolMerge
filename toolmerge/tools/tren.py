@@ -8,8 +8,9 @@ Splits ``QuerySearch.forward()`` into:
    cached track tokens. Cheap; runs per query.
 
 Per-frame scores have shape ``(T,)``, matching SigLIP-2, so downstream code
-treats both tools the same. T-REN model code is under ``tren/``; weights are
-downloaded separately.
+treats both tools the same. T-REN model code lives in the top-level
+``tren/`` package; weights are downloaded separately via
+``scripts/download_tren_weights.sh``.
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ _query_search_cache: Optional[dict] = None
 
 
 def default_config_path() -> str:
-    # Co-located with the vendored ``tren`` package at repo root.
+    # Co-located with the top-level ``tren`` package.
     here = os.path.dirname(os.path.abspath(__file__))
     return os.path.abspath(os.path.join(here, "..", "..", "tren", "video_query_search", "config.yaml"))
 
@@ -83,7 +84,7 @@ class TrenClient:
                 os.path.dirname(self.checkpoint_override)
             )
 
-        # Vendored T-REN package at repo root.
+        # Top-level T-REN package.
         from tren.video_query_search.models import QuerySearch  # noqa: E501  pylint: disable=import-outside-toplevel
 
         logger.info("Loading T-REN QuerySearch from config: %s", self.config_path)

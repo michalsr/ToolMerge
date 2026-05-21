@@ -1,7 +1,7 @@
 """Command-line entry point.
 
 Usage:
-    python -m toolmerge.run config=configs/tables/table4_m2m_retrieval.yaml
+    python -m toolmerge.run config=configs/m2m/retrieval.yaml
     python -m toolmerge.run --config <path> data.save_path=...
 
 The CLI parses an OmegaConf YAML plus dot-path overrides, loads backends

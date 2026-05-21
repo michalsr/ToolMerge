@@ -5,7 +5,7 @@ cv2 (no feature caches needed) and writes indices in target-fps space so the
 shared answerer's ``extract_cv2`` recovers the same pixel frames.
 
 Usage:
-    python -m baselines.uniform.run config=configs/tables/table4_m2m_retrieval.yaml
+    python -m baselines.uniform.run config=configs/m2m/retrieval.yaml
 """
 
 from __future__ import annotations

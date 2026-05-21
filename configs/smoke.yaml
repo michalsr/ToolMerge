@@ -1,0 +1,28 @@
+# Tiny smoke run on M2M val — confirms the pipeline runs end-to-end.
+
+defaults:
+  - ./default
+
+model:
+  base: Qwen/Qwen3-VL-8B-Instruct
+  attn_implementation: flash_attention_2
+  device_map: auto
+
+data:
+  input_path: ${oc.env:TOOLMERGE_DATA_DIR,data}/m2m/val.json
+  save_path: ???                       # set via CLI override
+  video_dir: ${oc.env:TOOLMERGE_DATA_DIR,data}/m2m/videos
+  video_backend: opencv
+
+siglip_feature_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/siglip/m2m
+tren_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/tren/m2m
+ocr_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr/m2m
+ocr_judge_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr_judge/m2m
+
+# OCR judge via OpenAI / Azure GPT-4o-mini.
+ocr_llm_model: openai:gpt-4o-mini
+
+# Answerer = local Qwen3-VL-8B; planner reuses it.
+model_backend: qwen3vl
+
+max_final_k: 8

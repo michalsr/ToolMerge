@@ -20,7 +20,7 @@ Hyperparameters (paper defaults):
         score-driven at every K.
 
 Usage:
-    python -m baselines.aks.run config=configs/tables/table2_lvb_qwen3_8.yaml
+    python -m baselines.aks.run config=configs/lvb/qwen3_8.yaml
 """
 
 from __future__ import annotations

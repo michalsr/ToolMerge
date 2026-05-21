@@ -12,7 +12,7 @@ Standalone: no imports from ``toolmerge``. The
 (https://github.com/MAC-AutoML/WFS-SB) at ``wfs/core.py``.
 
 Usage:
-    python -m baselines.wfs.run config=configs/tables/table2_lvb_qwen3_8.yaml
+    python -m baselines.wfs.run config=configs/lvb/qwen3_8.yaml
 """
 
 from __future__ import annotations

@@ -1,0 +1,19 @@
+# Molmo-2 Moments (M2M) test, Qwen3-VL answerer, 8 frames.
+# Paper accuracy: 61.6% zero-shot, 63.0% with the released GRPO planner
+# (override `model.base=<grpo-ckpt>` to reproduce the +GRPO row).
+
+defaults:
+  - ../default
+
+data:
+  input_path: ${oc.env:TOOLMERGE_DATA_DIR,data}/m2m/test.json
+  save_path: ${oc.env:TOOLMERGE_OUTPUT_DIR,outputs}/m2m_qwen3_8
+  video_dir: ${oc.env:TOOLMERGE_DATA_DIR,data}/m2m/videos
+
+siglip_feature_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/siglip/m2m
+tren_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/tren/m2m
+ocr_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr/m2m
+ocr_judge_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr_judge/m2m
+
+max_final_k: 8
+model_backend: qwen3vl

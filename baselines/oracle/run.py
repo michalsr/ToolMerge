@@ -8,7 +8,7 @@ meaningful on benchmarks with clip-level supervision (Molmo-2 Moments) and
 reported as the upper-bound reference in Table 3.
 
 Usage:
-    python -m baselines.oracle.run config=configs/tables/table3_m2m_qa_qwen3_8.yaml
+    python -m baselines.oracle.run config=configs/m2m/qwen3_8.yaml
 """
 
 from __future__ import annotations

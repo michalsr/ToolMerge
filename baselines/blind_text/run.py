@@ -6,7 +6,7 @@ Tables 2 and 3 of the paper as the floor (random chance is 25 % on 4-choice,
 chance by exploiting world-knowledge regularities in the wrong distractors).
 
 Usage:
-    python -m baselines.blind_text.run config=configs/tables/table3_m2m_qa_qwen3_8.yaml
+    python -m baselines.blind_text.run config=configs/m2m/qwen3_8.yaml
 """
 
 from __future__ import annotations
