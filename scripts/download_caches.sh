@@ -1,15 +1,23 @@
 #!/usr/bin/env bash
-# Download precomputed SigLIP / T-REN / OCR caches from the Hugging Face Hub.
+# Pre-built caches are NOT redistributed; build them locally with cache_build/.
 #
-# PLACEHOLDER — set TOOLMERGE_CACHES_REPO to the actual HF Hub repo once
-# we publish it. Until then, build the caches yourself with cache_build/,
-# or contact the authors for an out-of-band bundle.
+# See README.md "Building the per-video caches" and `cache_build/README.md`
+# for the full instructions.
 
 set -euo pipefail
 
-HF_REPO="${TOOLMERGE_CACHES_REPO:-toolmerge/caches}"
-DEST="${TOOLMERGE_CACHE_DIR:-$(dirname "$(realpath "$0")")/../caches}"
-mkdir -p "$DEST"
+cat <<EOF
+Per-video caches are not redistributed. Build them locally with:
 
-echo "Downloading caches from $HF_REPO -> $DEST"
-echo "(skipped — repo not yet published; see cache_build/README.md to build locally)"
+  python -m cache_build.build_caches \\
+      --video_dir <path-to-videos> \\
+      --dataset_json <path-to-dataset.json> \\
+      --tools siglip tren_per_frame ocr \\
+      --siglip_output_dir \${TOOLMERGE_CACHE_DIR}/siglip/<dataset> \\
+      --tren_per_frame_output_dir \${TOOLMERGE_CACHE_DIR}/tren/<dataset> \\
+      --ocr_output_dir \${TOOLMERGE_CACHE_DIR}/ocr/<dataset> \\
+      --video_backend cv2
+
+The OCR-judge cache is per-question and built lazily by the runtime on first
+inference — no pre-build step required.
+EOF

@@ -6,7 +6,7 @@ ToolMerge is a keyframe-retrieval method for long-video QA. A text-only LLM plan
 
 The repo also releases two long-video evaluation sets:
 
-- **Molmo-2 Moments** (M2C-v2) — long-video QA where every question is anchored to a specific time interval. 
+- **Molmo-2 Moments** (M2M) — long-video QA where every question is anchored to a specific time interval.
 - **Molmo-2 Captions** — 1000 caption + clip-interval pairs used for caption-retrieval evaluation.
 
 See [Datasets](#datasets) below.
@@ -23,11 +23,8 @@ pip install -e .
 # Optional: export TOOLMERGE_DATA_DIR / TOOLMERGE_CACHE_DIR / TOOLMERGE_OUTPUT_DIR
 # (configs fall back to ./data, ./caches, ./outputs if unset)
 
-# 1. Download precomputed caches (M2C-v2 / LVB / Video-MME) and T-REN weights
-#    NOTE: HF Hub release pending — the `download_*` scripts are placeholders
-#    pointing at `toolmerge/<repo>` slugs that will be filled in at release.
-#    For now, contact the authors for the weight + cache bundle.
-./scripts/download_caches.sh
+# 1. Download T-REN weights, then build the per-video caches once (see
+#    cache_build/ for SigLIP / T-REN / OCR / OCR-judge build instructions).
 ./scripts/download_tren_weights.sh
 
 # 2. Run one paper-row config on a single GPU
@@ -64,7 +61,7 @@ configs/
   {lvb,m2m,vmme}/         # per-row YAMLs, one subdir per dataset (see "Configs")
   smoke.yaml              # tiny smoke run on M2M val
 scripts/                  # standalone helper scripts (caption retrieval eval, etc.)
-tests/                    # 25 unit tests
+tests/                    # unit tests (`pytest tests/`)
 ```
 
 ## Configs
@@ -127,9 +124,8 @@ The same `toolmerge/tools/{siglip,tren,ocr_judge}.py` clients are imported by bo
 
 ## Building the per-video caches
 
-> **TODO:** publish the pre-built cache bundles on Hugging Face Hub. Until then, run the build locally.
-
-On-disk layout consumed by the pipeline:
+We do not redistribute the per-video caches — build them locally once with
+`cache_build/`. On-disk layout consumed by the pipeline:
 
 ```
 ${TOOLMERGE_CACHE_DIR}/
@@ -152,11 +148,13 @@ python -m cache_build.build_caches \
     --video_backend cv2
 ```
 
-Each video takes ~2 min on an A100. LVB val (1337 videos, ~7 min avg) ≈ 12 GPU-hours. Per-tool commands and chunking flags are in `cache_build/README.md`.
+Per-tool commands and chunking flags are in `cache_build/README.md`.
 
 ### OCR judge cache (per-question)
 
-`ocr_judge/<dataset>/{uid}.json` is per-question and must be **pre-built before inference**. The paper datasets ship with these caches in the bundle; if you bring your own dataset you need to build them yourself.
+`ocr_judge/<dataset>/{uid}.json` is per-question and built lazily on first
+inference: the OCR-judge LLM call writes its decisions to the cache so reruns
+hit it instead of re-querying the LLM. No pre-build step required.
 
 ## Training (planner GRPO)
 
@@ -180,8 +178,9 @@ The paper's released checkpoint is `global_step=50` of this run.
 
 ## Common CLI overrides
 
-Every field in `configs/default.yaml` (or the per-table YAML) can be overridden at the
-command line via OmegaConf dotted paths — no extra flags. Examples:
+Every field in `configs/default.yaml` (or a per-row YAML under
+`configs/{lvb,m2m,vmme}/`) can be overridden at the command line via
+OmegaConf dotted paths — no extra flags. Examples:
 
 ```bash
 # Run only the first 50 items as a quick check
@@ -230,8 +229,6 @@ toolmerge config=configs/lvb/qwen3_32.yaml \
 
 ## Baselines
 
-> **TODO:** the `baselines/wfs/` directory currently shares its name with the WFS baseline algorithm. Rename to disambiguate (e.g., split the wavelet algorithm into its own subdir; treat the rest as separate baselines).
-
 Code to reproduce the comparison methods lives under `baselines/`. Each method writes `keyframes.json` in a shared shape; the toolmerge answerer consumes it via `data.source_dir`. Example:
 
 ```bash
@@ -248,7 +245,7 @@ toolmerge config=configs/lvb/qwen3_8.yaml \
 | Method | Where | Notes |
 |---|---|---|
 | Uniform | `baselines/uniform/` | |
-| Oracle | `baselines/oracle/` | M2C-v2 only (needs `start`/`end`) |
+| Oracle | `baselines/oracle/` | M2M only (needs `start`/`end`) |
 | Blind Text | `baselines/blind_text/` | |
 | SigLIP-Q | `baselines/siglip_q/` | |
 | AKS | `baselines/aks/` | |
@@ -330,9 +327,14 @@ To run ToolMerge on a new dataset:
 
 2. **Build the per-video caches** (one-time, on a GPU):
    ```bash
-   python cache_build/build_caches.py \
-       --videos /path/to/your_videos/ \
-       --output ${TOOLMERGE_CACHE_DIR}/{siglip,tren,ocr}/your_dataset/
+   python -m cache_build.build_caches \
+       --video_dir /path/to/your_videos/ \
+       --dataset_json /path/to/your_dataset/test.json \
+       --tools siglip tren_per_frame ocr \
+       --siglip_output_dir ${TOOLMERGE_CACHE_DIR}/siglip/your_dataset \
+       --tren_per_frame_output_dir ${TOOLMERGE_CACHE_DIR}/tren/your_dataset \
+       --ocr_output_dir ${TOOLMERGE_CACHE_DIR}/ocr/your_dataset \
+       --video_backend cv2
    ```
    This emits `${video_id}.feature_cache_qwen3vl`, `${video_id}.tren_pf_cache_qwen3vl`, and `${video_id}.ocr_cache` for each video.
 
@@ -350,14 +352,31 @@ To run ToolMerge on a new dataset:
    ocr_cache_dir: ${oc.env:TOOLMERGE_CACHE_DIR,caches}/ocr/your_dataset
    max_final_k: 8
    model_backend: qwen3vl
-   answer_generator:
-     prompt_template: v1
    ```
 
 4. **Run it**:
    ```bash
    toolmerge config=configs/your_dataset/qwen3_8.yaml
    ```
+
+## Citation
+
+If you use ToolMerge, the Molmo-2 Moments QA set, or the Molmo-2 Captions
+retrieval set, please cite our paper:
+
+```bibtex
+@inproceedings{toolmerge2026,
+  title     = {Decomposing Queries into Tool Calls for Long-Video Keyframe Retrieval},
+  author    = {TODO: author list},
+  booktitle = {TODO: venue},
+  year      = {2026},
+}
+```
+
+## Issues and contact
+
+Bug reports, reproducibility questions, and feature requests are welcome on
+the [GitHub issue tracker](https://github.com/michalsr/ToolMerge/issues).
 
 ## License
 
