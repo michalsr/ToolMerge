@@ -446,11 +446,14 @@ If you use ToolMerge, the Molmo-2 Moments QA set, or the Molmo-2 Captions
 retrieval set, please cite our paper:
 
 ```bibtex
-@inproceedings{toolmerge2026,
-  title     = {Decomposing Queries into Tool Calls for Long-Video Keyframe Retrieval},
-  author    = {TODO: author list},
-  booktitle = {TODO: venue},
-  year      = {2026},
+@misc{shlapentokhrothman2026decomposingqueriestoolcalls,
+  title         = {Decomposing Queries into Tool Calls for Long-Video Keyframe Retrieval},
+  author        = {Michal Shlapentokh-Rothman and Prachi Garg and Yu-Xiong Wang and Derek Hoiem},
+  year          = {2026},
+  eprint        = {2605.23826},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CV},
+  url           = {https://arxiv.org/abs/2605.23826},
 }
 ```
 
